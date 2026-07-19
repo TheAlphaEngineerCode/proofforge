@@ -29,6 +29,9 @@ class TestEvidence(BaseModel):
     # coverage lands this mirrors the total and is flagged as approximate.
     coverage_changed: float = 0.0
     coverage_is_approximate: bool = True
+    #: Whether a coverage report was actually parsed. Without this, an absent
+    #: report is indistinguishable from a genuine 0% and gets charged as one.
+    coverage_collected: bool = False
     collected: bool = False
 
 

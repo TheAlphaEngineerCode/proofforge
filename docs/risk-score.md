@@ -44,8 +44,14 @@ the score.
 | --- | --- |
 | Failing test | +25 each |
 | Coverage below 90% | +1 per point below |
+| **No coverage report** | **+15** |
 | **Test run found no tests** | **+50** |
 | **Tests could not be executed** | **+20** |
+
+The coverage rule follows the same principle as the rest: a missing report reads
+as 0%, and billing that as a 90-point shortfall would punish a repository for a
+collector that produced nothing. A report that genuinely says 40% is charged for
+the 50 points it really is short.
 
 Those last two look identical in the counters and mean opposite things, so
 provenance decides between them:
@@ -62,7 +68,7 @@ provenance decides between them:
 The overall score leans on the worst category so a single critical finding cannot
 be averaged away, while still reflecting the whole picture:
 
-```
+```text
 overall = clamp(round(0.6 × worst_category + 0.4 × mean_of_categories))
 ```
 

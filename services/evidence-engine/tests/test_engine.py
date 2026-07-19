@@ -200,3 +200,30 @@ def test_unrunnable_tests_cost_less_than_a_repo_without_tests(tmp_path) -> None:
 
     no_tests_reasons = " ".join(no_tests.manifest["risk"]["reasons"])
     assert "found no tests" in no_tests_reasons
+
+
+class TestsWithoutCoverageToolchain(EmptyToolchain):
+    """Tests run and pass, but no coverage report is produced."""
+
+    def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
+        junit = '<testsuite tests="10" failures="0" errors="0" skipped="0" time="1"/>'
+        return RawOutput(status="ok", text=junit), RawOutput(status="unavailable")
+
+
+def test_absent_coverage_is_not_billed_as_zero_percent(tmp_path, read_fixture) -> None:
+    """A missing report must cost far less than a measured 0% would."""
+    no_report = EvidenceEngine(TestsWithoutCoverageToolchain()).run(
+        tmp_path / "a", _context(), tmp_path / "bundle-a"
+    )
+    reasons = " ".join(no_report.manifest["risk"]["reasons"])
+
+    assert "No coverage report" in reasons
+    # A 0% reading would have added the full 90-point shortfall.
+    assert "below the 90% guideline" not in reasons
+    assert no_report.manifest["risk"]["score"] < 40
+
+    # Measured coverage still gets charged for the shortfall it really has.
+    measured = EvidenceEngine(FakeToolchain(read_fixture)).run(
+        tmp_path / "b", _context(), tmp_path / "bundle-b"
+    )
+    assert "below the 90% guideline" in " ".join(measured.manifest["risk"]["reasons"])

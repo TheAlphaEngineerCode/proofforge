@@ -56,6 +56,11 @@ COVERAGE_TARGET = 90.0
 #: what it claims, so their absence dominates the score by design.
 NO_TESTS_PENALTY = 50
 
+#: Charged when the tests ran but produced no coverage report. Same reasoning as
+#: the other unmeasured penalties: silence costs something, but far less than a
+#: measured shortfall would.
+UNMEASURED_COVERAGE_PENALTY = 15
+
 #: Charged when we could not execute the tests at all — no sandbox image, a
 #: crashed runner, a timeout. Deliberately lighter than NO_TESTS_PENALTY: this is
 #: our inability to measure, not a finding about the repository. It still costs
@@ -121,15 +126,28 @@ def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
             "nothing asserts that this change behaves as intended."
         )
     else:
-        coverage_gap = max(0.0, COVERAGE_TARGET - tests.coverage_total)
-        tests_score = _clamp(tests.failed * FAILED_TEST_PENALTY + int(coverage_gap))
+        tests_score = tests.failed * FAILED_TEST_PENALTY
         if tests.failed:
             reasons.append(f"{tests.failed} failing tests (+{FAILED_TEST_PENALTY} each).")
-        if tests.coverage_total < COVERAGE_TARGET:
+
+        # Only charge the coverage gap when coverage was actually reported. An
+        # absent report reads as 0%, and billing that as a 90-point shortfall
+        # would punish a repository for a collector that never produced output.
+        if not tests.coverage_collected:
+            tests_score += UNMEASURED_COVERAGE_PENALTY
+            reasons.append(
+                f"No coverage report (+{UNMEASURED_COVERAGE_PENALTY}): the tests ran, "
+                "but how much of the change they exercise is unknown."
+            )
+        elif tests.coverage_total < COVERAGE_TARGET:
+            gap = int(COVERAGE_TARGET - tests.coverage_total)
+            tests_score += gap
             reasons.append(
                 f"Coverage {tests.coverage_total:.1f}% below the "
-                f"{COVERAGE_TARGET:.0f}% guideline."
+                f"{COVERAGE_TARGET:.0f}% guideline (+{gap})."
             )
+
+        tests_score = _clamp(tests_score)
 
     categories = {
         "security": security_score,

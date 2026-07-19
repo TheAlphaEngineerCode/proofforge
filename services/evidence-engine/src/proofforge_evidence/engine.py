@@ -111,6 +111,7 @@ class EvidenceEngine:
             else:
                 evidence.tests.coverage_total = total
                 evidence.tests.coverage_changed = total  # approximate until diff-aware
+                evidence.tests.coverage_collected = True
                 artifacts.append(self._persist("coverage.xml", "coverage", coverage.text, out))
 
         evidence.runs.append(run)
