@@ -7,6 +7,8 @@ export { InMemoryStorage } from "./memory.js";
 export type {
   Storage,
   Session,
+  Installation,
+  NewInstallation,
   NewUser,
   NewOrganization,
   NewRepository,

@@ -6,6 +6,7 @@ import { registerAuth } from "./plugins/auth.js";
 import { analysisRoutes } from "./routes/analyses.js";
 import { authRoutes } from "./routes/auth.js";
 import { evidenceBundleRoutes } from "./routes/evidence-bundles.js";
+import { githubWebhookRoutes } from "./routes/github-webhook.js";
 import { healthRoutes } from "./routes/health.js";
 import { organizationRoutes } from "./routes/organizations.js";
 import { policyRoutes } from "./routes/policies.js";
@@ -47,6 +48,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   analysisRoutes(app, deps);
   evidenceBundleRoutes(app, deps);
   policyRoutes(app, deps);
+  await githubWebhookRoutes(app, deps);
 
   return app;
 }

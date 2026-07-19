@@ -10,6 +10,12 @@ const ConfigSchema = z.object({
   webOrigin: z.string().default("http://localhost:3000"),
   /** Milliseconds between simulated pipeline steps (0 in tests for speed). */
   pipelineStepMs: z.coerce.number().int().nonnegative().default(400),
+
+  // GitHub App. Absent values simply disable the integration.
+  githubAppId: z.string().default(""),
+  githubPrivateKey: z.string().default(""),
+  githubWebhookSecret: z.string().default(""),
+  githubApiBaseUrl: z.string().default("https://api.github.com"),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -23,6 +29,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     devLogin: env.AUTH_DEV_LOGIN,
     webOrigin: env.WEB_BASE_URL,
     pipelineStepMs: env.PIPELINE_STEP_MS,
+    githubAppId: env.GITHUB_APP_ID,
+    githubPrivateKey: env.GITHUB_APP_PRIVATE_KEY,
+    githubWebhookSecret: env.GITHUB_WEBHOOK_SECRET,
+    githubApiBaseUrl: env.GITHUB_API_BASE_URL,
   });
 
   // Never expose the credential-free dev-login in production, whatever the env says.

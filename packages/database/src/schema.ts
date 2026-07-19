@@ -67,6 +67,15 @@ export const repositories = pgTable(
   (table) => [index("repositories_org_idx").on(table.organizationId)],
 );
 
+export const installations = pgTable("installations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  githubInstallationId: integer("github_installation_id").notNull().unique(),
+  accountLogin: text("account_login"),
+  suspended: boolean("suspended").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const analyses = pgTable(
   "analyses",
   {

@@ -1,0 +1,76 @@
+/**
+ * Turning evidence into a GitHub Check Run verdict.
+ *
+ * The verdict is derived deterministically from the manifest — never from a
+ * model's opinion — so the same evidence always yields the same conclusion.
+ */
+import type { Manifest } from "@proofforge/evidence-spec";
+
+export type CheckConclusion = "success" | "failure" | "neutral";
+
+export interface CheckRunResult {
+  conclusion: CheckConclusion;
+  title: string;
+  summary: string;
+}
+
+export interface Verdict {
+  conclusion: CheckConclusion;
+  /** Findings that force a failure, in the order they were evaluated. */
+  blocking: string[];
+  headline: string;
+}
+
+/** Risk at or below this score may pass without human review. */
+const AUTO_APPROVAL_MAX_RISK = 20;
+
+export function evaluateManifest(manifest: Manifest): Verdict {
+  const blocking: string[] = [];
+
+  if (manifest.tests.failed > 0) {
+    blocking.push(`${manifest.tests.failed} failing test(s)`);
+  }
+  if (manifest.security.secretsDetected > 0) {
+    blocking.push(`${manifest.security.secretsDetected} secret(s) detected`);
+  }
+  if (manifest.security.criticalVulnerabilities > 0) {
+    blocking.push(`${manifest.security.criticalVulnerabilities} critical vulnerability(ies)`);
+  }
+  if (manifest.policies.failed.length > 0) {
+    blocking.push(`${manifest.policies.failed.length} policy violation(s)`);
+  }
+  if (manifest.operations.migrationsDetected && !manifest.operations.migrationsReversible) {
+    blocking.push("irreversible migration");
+  }
+
+  if (blocking.length > 0) {
+    return { conclusion: "failure", blocking, headline: "Blocked — evidence shows failures" };
+  }
+  if (manifest.risk.score <= AUTO_APPROVAL_MAX_RISK) {
+    return { conclusion: "success", blocking, headline: "Verified — low risk" };
+  }
+  return { conclusion: "neutral", blocking, headline: "Human approval recommended" };
+}
+
+export function mapManifestToCheckRun(manifest: Manifest): CheckRunResult {
+  const verdict = evaluateManifest(manifest);
+  const { tests, security, risk } = manifest;
+
+  const summary = [
+    `**Risk ${risk.score}/100 — ${risk.level}**`,
+    "",
+    `- Tests: ${tests.passed} passed, ${tests.failed} failed, ${tests.skipped} skipped`,
+    `- Coverage on changed lines: ${tests.coverage.changedLines}%`,
+    `- Vulnerabilities: ${security.criticalVulnerabilities} critical, ${security.highVulnerabilities} high`,
+    `- Secrets detected: ${security.secretsDetected}`,
+    `- SBOM: ${security.sbomGenerated ? "generated" : "not generated"}`,
+    "",
+    verdict.blocking.length > 0
+      ? `**Blocking:** ${verdict.blocking.join("; ")}.`
+      : "No blocking findings.",
+    "",
+    `Evidence hash: \`${manifest.evidenceHash}\``,
+  ].join("\n");
+
+  return { conclusion: verdict.conclusion, title: verdict.headline, summary };
+}

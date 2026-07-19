@@ -17,8 +17,10 @@ import type {
 } from "@proofforge/shared-types";
 import type {
   AnalysisUpdate,
+  Installation,
   NewAnalysis,
   NewEvidenceBundle,
+  NewInstallation,
   NewOrganization,
   NewPolicy,
   NewRepository,
@@ -38,6 +40,7 @@ export class InMemoryStorage implements Storage {
   private readonly bundles = new Map<string, EvidenceBundle>();
   private readonly manifests = new Map<string, unknown>();
   private readonly policies = new Map<string, Policy>();
+  private readonly installations = new Map<number, Installation>();
 
   private now(): string {
     return new Date().toISOString();
@@ -125,6 +128,34 @@ export class InMemoryStorage implements Storage {
 
   async getRepository(id: string): Promise<Repository | null> {
     return this.repositories.get(id) ?? null;
+  }
+
+  async findRepositoryByFullName(owner: string, name: string): Promise<Repository | null> {
+    for (const repo of this.repositories.values()) {
+      if (repo.owner === owner && repo.name === name) return repo;
+    }
+    return null;
+  }
+
+  async upsertInstallation(input: NewInstallation): Promise<Installation> {
+    const existing = this.installations.get(input.githubInstallationId);
+    const installation: Installation = {
+      id: existing?.id ?? randomUUID(),
+      githubInstallationId: input.githubInstallationId,
+      accountLogin: input.accountLogin ?? existing?.accountLogin ?? null,
+      suspended: input.suspended ?? existing?.suspended ?? false,
+      createdAt: existing?.createdAt ?? this.now(),
+    };
+    this.installations.set(installation.githubInstallationId, installation);
+    return installation;
+  }
+
+  async getInstallation(githubInstallationId: number): Promise<Installation | null> {
+    return this.installations.get(githubInstallationId) ?? null;
+  }
+
+  async deleteInstallation(githubInstallationId: number): Promise<void> {
+    this.installations.delete(githubInstallationId);
   }
 
   async createAnalysis(input: NewAnalysis): Promise<Analysis> {

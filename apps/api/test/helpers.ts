@@ -9,8 +9,13 @@ export interface TestApp {
   deps: AppDeps;
 }
 
-export async function setup(): Promise<TestApp> {
-  const config = loadConfig({ NODE_ENV: "test", AUTH_DEV_LOGIN: "true", PIPELINE_STEP_MS: "0" });
+export async function setup(env: NodeJS.ProcessEnv = {}): Promise<TestApp> {
+  const config = loadConfig({
+    NODE_ENV: "test",
+    AUTH_DEV_LOGIN: "true",
+    PIPELINE_STEP_MS: "0",
+    ...env,
+  });
   const deps = createDeps(config);
   const app = await buildApp(deps);
   return { app, deps };

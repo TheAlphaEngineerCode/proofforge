@@ -73,6 +73,21 @@ export interface Session {
   expiresAt: string;
 }
 
+/** A GitHub App installation, recorded so webhooks can be authorized and routed. */
+export interface Installation {
+  id: string;
+  githubInstallationId: number;
+  accountLogin: string | null;
+  suspended: boolean;
+  createdAt: string;
+}
+
+export interface NewInstallation {
+  githubInstallationId: number;
+  accountLogin?: string | null;
+  suspended?: boolean;
+}
+
 export interface Storage {
   createUser(input: NewUser): Promise<User>;
   getUser(id: string): Promise<User | null>;
@@ -88,6 +103,12 @@ export interface Storage {
   createRepository(input: NewRepository): Promise<Repository>;
   listRepositories(organizationId: string): Promise<Repository[]>;
   getRepository(id: string): Promise<Repository | null>;
+  /** Resolve a repository from the `owner/name` pair a webhook carries. */
+  findRepositoryByFullName(owner: string, name: string): Promise<Repository | null>;
+
+  upsertInstallation(input: NewInstallation): Promise<Installation>;
+  getInstallation(githubInstallationId: number): Promise<Installation | null>;
+  deleteInstallation(githubInstallationId: number): Promise<void>;
 
   createAnalysis(input: NewAnalysis): Promise<Analysis>;
   getAnalysis(id: string): Promise<Analysis | null>;

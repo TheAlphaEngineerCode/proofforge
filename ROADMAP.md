@@ -66,7 +66,15 @@ policies; Next.js dashboard with real-time status.
 live, a visual report is available. ✅ (GitHub OAuth login is Phase 5; local dev-login works
 today. Wiring the Python evidence engine into the runner is later-phase.)
 
-## Phase 5 — GitHub App ⬜
+## Phase 5 — GitHub App ✅
+
+`packages/github` (webhook signature verification, event normalization, App JWT →
+installation tokens, REST client, deterministic verdict → Check Run, PR comment updated in
+place) plus the authenticated `/api/v1/github/webhook` endpoint and installation records.
+Deliveries are idempotent: a commit is analyzed once. Registering the App and pointing a
+public webhook URL at it is a manual step — see [docs/github-app.md](./docs/github-app.md).
+
+## Phase 5 — GitHub App (original scope) ⬜
 
 Install flow, webhooks, PR analysis, Checks API, PR comments, installation storage, minimal
 permissions, signature-validated webhooks.
