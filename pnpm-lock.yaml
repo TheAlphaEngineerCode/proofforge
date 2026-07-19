@@ -56,6 +56,9 @@ importers:
       '@proofforge/github':
         specifier: workspace:*
         version: link:../../packages/github
+      '@proofforge/policy-engine':
+        specifier: workspace:*
+        version: link:../../packages/policy-engine
       '@proofforge/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

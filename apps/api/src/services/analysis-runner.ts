@@ -19,6 +19,7 @@ import type { EventBus } from "../events.js";
 import { buildAnalysisManifest } from "../manifest.js";
 import type { RepositoryCheckout } from "./checkout.js";
 import type { EvidenceProducer } from "./evidence-producer.js";
+import type { PolicyGate } from "./policy-gate.js";
 
 /**
  * Real evidence collection: check the commit out, then run the engine over it.
@@ -42,8 +43,9 @@ const PIPELINE: readonly AnalysisStatus[] = [
   "PERFORMANCE_ANALYSIS",
   "EVIDENCE_GENERATION",
   "POLICY_VALIDATION",
-  "WAITING_FOR_HUMAN_APPROVAL",
 ];
+// The terminal state is not fixed: the policy decides whether a change is
+// approved, rejected, or handed to a human.
 
 const sleep = (ms: number): Promise<void> =>
   ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
@@ -68,6 +70,7 @@ export class AnalysisRunner {
     private readonly stepMs: number,
     private readonly evidence?: EvidencePipeline,
     private readonly logger: RunnerLogger = { warn: (message) => console.warn(message) },
+    private readonly policyGate?: PolicyGate,
   ) {}
 
   /** Start the pipeline for an analysis. Returns a promise that resolves when it ends. */
@@ -90,6 +93,9 @@ export class AnalysisRunner {
       const repository = await this.storage.getRepository(analysis.repositoryId);
       if (!repository) throw new Error(`repository not found: ${analysis.repositoryId}`);
 
+      let manifest: Manifest | undefined;
+      let finalStatus: AnalysisStatus = "WAITING_FOR_HUMAN_APPROVAL";
+
       for (const status of PIPELINE) {
         await sleep(this.stepMs);
         if (!canTransition(previous, status)) {
@@ -97,30 +103,37 @@ export class AnalysisRunner {
         }
 
         if (status === "EVIDENCE_GENERATION") {
-          await this.generateEvidence(analysisId, repository.owner, repository.name, {
+          manifest = await this.produceManifest(repository.owner, repository.name, {
             commit: analysis.commitSha,
             branch: repository.defaultBranch,
           });
         }
 
+        if (status === "POLICY_VALIDATION" && manifest !== undefined) {
+          // The policy writes its outcomes into the manifest, so the bundle is
+          // persisted only after this — one write, and a hash that matches.
+          finalStatus = await this.applyPolicy(analysisId, repository.organizationId, manifest);
+          await this.persistBundle(analysisId, manifest, analysis.commitSha);
+        }
+
         await this.storage.updateAnalysis(analysisId, { status });
-        this.events.publish(analysisId, {
-          version: EVENT_SCHEMA_VERSION,
-          type: "status",
-          analysisId,
-          status,
-          previousStatus: previous,
-          at: new Date().toISOString(),
-        });
+        this.publishStatus(analysisId, status, previous);
         previous = status;
       }
+
+      await sleep(this.stepMs);
+      if (!canTransition(previous, finalStatus)) {
+        throw new Error(`illegal transition ${previous} -> ${finalStatus}`);
+      }
+      await this.storage.updateAnalysis(analysisId, { status: finalStatus });
+      this.publishStatus(analysisId, finalStatus, previous);
 
       const final = await this.storage.getAnalysis(analysisId);
       this.events.publish(analysisId, {
         version: EVENT_SCHEMA_VERSION,
         type: "completed",
         analysisId,
-        status: "WAITING_FOR_HUMAN_APPROVAL",
+        status: finalStatus,
         riskScore: final?.riskScore ?? null,
         evidenceBundleId: final?.evidenceBundleId ?? null,
         at: new Date().toISOString(),
@@ -138,12 +151,12 @@ export class AnalysisRunner {
     }
   }
 
-  private async generateEvidence(
-    analysisId: string,
+  /** Build the manifest. Persisting it waits until the policy has had its say. */
+  private async produceManifest(
     owner: string,
     name: string,
     change: { commit: string; branch: string },
-  ): Promise<void> {
+  ): Promise<Manifest> {
     const manifest =
       (await this.collectRealEvidence(owner, name, change)) ??
       buildAnalysisManifest({
@@ -153,18 +166,49 @@ export class AnalysisRunner {
         commit: change.commit,
         baseCommit: change.commit,
         branch: change.branch,
-        // Interim placeholder risk; the engine supplies real scoring when available,
-        // and the Risk Engine (Phase 6) supersedes both.
+        // Interim placeholder risk; the engine supplies real scoring when available.
         riskScore: 18,
         riskLevel: "low",
       });
 
+    return manifest;
+  }
+
+  /** Evaluate the org's policy against the manifest; returns the terminal state. */
+  private async applyPolicy(
+    analysisId: string,
+    organizationId: string,
+    manifest: Manifest,
+  ): Promise<AnalysisStatus> {
+    if (!this.policyGate) return "WAITING_FOR_HUMAN_APPROVAL";
+
+    const { report, finalStatus } = await this.policyGate.apply(organizationId, manifest);
+    if (report !== undefined) {
+      const waived = report.warnings.filter((entry) => entry.waivedBy !== undefined);
+      for (const outcome of waived) {
+        // A waived rule is a decision someone made; it belongs in the audit trail.
+        this.logger.warn(
+          `[policy] ${analysisId}: rule ${outcome.rule} waived by ${outcome.waivedBy ?? "unknown"}`,
+        );
+      }
+      if (report.decision === "blocked") {
+        await this.storage.updateAnalysis(analysisId, { error: report.summary });
+      }
+    }
+    return finalStatus;
+  }
+
+  private async persistBundle(
+    analysisId: string,
+    manifest: Manifest,
+    commitSha: string,
+  ): Promise<void> {
     const riskScore = manifest.risk.score;
     const riskLevel = manifest.risk.level as RiskLevel;
 
     const bundle = await this.storage.createEvidenceBundle({
       analysisId,
-      commitSha: change.commit,
+      commitSha,
       manifestVersion: manifest.specVersion,
       riskScore,
       evidenceHash: manifest.evidenceHash,
@@ -175,6 +219,21 @@ export class AnalysisRunner {
       evidenceBundleId: bundle.id,
       riskScore,
       riskLevel,
+    });
+  }
+
+  private publishStatus(
+    analysisId: string,
+    status: AnalysisStatus,
+    previous: AnalysisStatus,
+  ): void {
+    this.events.publish(analysisId, {
+      version: EVENT_SCHEMA_VERSION,
+      type: "status",
+      analysisId,
+      status,
+      previousStatus: previous,
+      at: new Date().toISOString(),
     });
   }
 

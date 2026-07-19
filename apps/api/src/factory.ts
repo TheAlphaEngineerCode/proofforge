@@ -18,11 +18,20 @@ import { AnalysisRunner, type EvidencePipeline } from "./services/analysis-runne
 import { GitRepositoryCheckout } from "./services/checkout.js";
 import { PythonEvidenceProducer } from "./services/evidence-producer.js";
 import { GitHubPublisher } from "./services/github-publisher.js";
+import { PolicyGate } from "./services/policy-gate.js";
 
 export function createDeps(config: Config, storage?: Storage): AppDeps {
   const store = storage ?? createStorage(config);
   const events = new EventBus();
-  const runner = new AnalysisRunner(store, events, config.pipelineStepMs, createEvidencePipeline(config));
+  const logger = { warn: (message: string) => console.warn(message) };
+  const runner = new AnalysisRunner(
+    store,
+    events,
+    config.pipelineStepMs,
+    createEvidencePipeline(config),
+    logger,
+    new PolicyGate(store, logger),
+  );
   const publisher = createPublisher(config, store);
 
   return { storage: store, events, runner, config, ...(publisher ? { publisher } : {}) };
