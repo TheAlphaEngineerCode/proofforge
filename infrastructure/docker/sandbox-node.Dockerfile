@@ -5,13 +5,16 @@
 # run time, so nothing the tests do can reach the source or the host.
 FROM node:20-slim
 
-# pnpm and npm cover the lockfiles we detect; corepack ships with the base image.
+# The uid must match the one the sandbox runs as (SandboxSpec.user). The image's
+# built-in `node` user is uid 1000, so the working directory would be owned by
+# someone the container never becomes, and every write would be denied.
 RUN corepack enable \
     && corepack prepare pnpm@9.15.0 --activate \
+    && useradd --create-home --uid 10001 runner \
     && mkdir -p /work /out \
-    && chown node:node /work /out
+    && chown runner:runner /work /out
 
-USER node
+USER runner
 WORKDIR /work
 
 # The engine passes the actual script; this is a safe default for a bare run.
