@@ -44,7 +44,18 @@ the score.
 | --- | --- |
 | Failing test | +25 each |
 | Coverage below 90% | +1 per point below |
-| **No test evidence collected** | **+50** |
+| **Test run found no tests** | **+50** |
+| **Tests could not be executed** | **+20** |
+
+Those last two look identical in the counters and mean opposite things, so
+provenance decides between them:
+
+- the `tests` collector reported `ok` and there was nothing to run — the
+  repository has no tests, which is a finding about the change, charged in full;
+- the collector never ran (no sandbox image, crash, timeout) — that is *our*
+  inability to measure, not a verdict on the repository. It still costs, because
+  unmeasured is not clean, but charging it as if the repository were untested
+  would blame a team for a gap on our side.
 
 ## Overall
 
@@ -69,20 +80,28 @@ overall = clamp(round(0.6 × worst_category + 0.4 × mean_of_categories))
 
 A repository analyzed on a host with no scanners installed and no sandbox image:
 
-```
+```text
 security: 3 unmeasured × 8                     = 24
-tests:    no test evidence                     = 50
+tests:    could not be executed                = 20
+worst = 24, mean = 22
+overall = round(0.6 × 24 + 0.4 × 22) = 23      → moderate
+```
+
+Nothing was found — because nothing could be looked at, and the score says so
+without pretending the repository is at fault.
+
+Contrast a repository where the runner worked and there were genuinely no tests:
+
+```text
+security: 3 unmeasured × 8                     = 24
+tests:    run completed, no tests              = 50
 worst = 50, mean = 37
 overall = round(0.6 × 50 + 0.4 × 37) = 45      → elevated
 ```
 
-Nothing was found — because nothing was looked at, and the score says so.
-
-Note which term dominates: the missing test evidence (+50), not the missing
-scanners (+24). Even with every scanner running clean, a change with no tests
-still scores 40. That ordering is deliberate — tests are the primary evidence
-that a change behaves as intended — but it means tuning the security weights
-alone will not move a score much. The test weight is the lever that does.
+Same counters, twice the score — because one is a gap in the change and the other
+is a gap in our tooling. Note also which term dominates once tests are genuinely
+missing: tuning the security weights alone moves a score very little.
 
 ## Reading the reasons
 

@@ -51,10 +51,16 @@ SECRET_PENALTY = 30
 FAILED_TEST_PENALTY = 25
 COVERAGE_TARGET = 90.0
 
-#: Charged when no test evidence exists at all. This is the heaviest single term
-#: in the model: tests are the primary evidence that a change does what it claims,
-#: so their absence dominates the score by design.
+#: Charged when the runner worked and the repository has no tests. The heaviest
+#: single term in the model: tests are the primary evidence that a change does
+#: what it claims, so their absence dominates the score by design.
 NO_TESTS_PENALTY = 50
+
+#: Charged when we could not execute the tests at all — no sandbox image, a
+#: crashed runner, a timeout. Deliberately lighter than NO_TESTS_PENALTY: this is
+#: our inability to measure, not a finding about the repository. It still costs
+#: something, because unmeasured is not the same as clean.
+UNMEASURED_TESTS_PENALTY = 20
 
 
 def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
@@ -96,7 +102,25 @@ def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
             f"({', '.join(unmeasured)}) (+{UNMEASURED_PENALTY} each): unverified, not clean."
         )
 
-    if tests.collected:
+    # Three different situations that all used to look like "no tests":
+    # we could not run them, we ran them and there were none, or we have results.
+    # Only the middle one is a statement about the repository.
+    tests_ran = any(run.name == "tests" and run.status == "ok" for run in evidence.runs)
+    total_tests = tests.passed + tests.failed + tests.skipped
+
+    if not tests_ran:
+        tests_score = UNMEASURED_TESTS_PENALTY
+        reasons.append(
+            f"Tests could not be executed (+{UNMEASURED_TESTS_PENALTY}): behaviour is "
+            "unverified, but this reflects the runner, not the repository."
+        )
+    elif total_tests == 0:
+        tests_score = NO_TESTS_PENALTY
+        reasons.append(
+            f"The test run completed and found no tests (+{NO_TESTS_PENALTY}): "
+            "nothing asserts that this change behaves as intended."
+        )
+    else:
         coverage_gap = max(0.0, COVERAGE_TARGET - tests.coverage_total)
         tests_score = _clamp(tests.failed * FAILED_TEST_PENALTY + int(coverage_gap))
         if tests.failed:
@@ -106,11 +130,6 @@ def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
                 f"Coverage {tests.coverage_total:.1f}% below the "
                 f"{COVERAGE_TARGET:.0f}% guideline."
             )
-    else:
-        tests_score = NO_TESTS_PENALTY
-        reasons.append(
-            f"No test evidence collected (+{NO_TESTS_PENALTY}): unable to confirm behavior."
-        )
 
     categories = {
         "security": security_score,

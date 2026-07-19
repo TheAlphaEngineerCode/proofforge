@@ -126,8 +126,9 @@ def test_all_unavailable_still_produces_valid_manifest(tmp_path: Path) -> None:
     manifest = result.manifest
     assert compute_evidence_hash(manifest) == manifest["evidenceHash"]
     assert manifest["tests"]["passed"] == 0
-    # no test evidence → interim risk flags it
-    assert manifest["risk"]["score"] >= 30
+    # Nothing could be measured, so the score is non-trivial — but this path is
+    # about the runner failing us, not the repository, and it is charged as such.
+    assert manifest["risk"]["score"] > 0
 
 
 def test_manifest_records_collector_provenance(tmp_path, read_fixture) -> None:
@@ -163,7 +164,7 @@ def test_reasons_quote_the_weights_actually_used(tmp_path, monkeypatch) -> None:
     """A reason must never quote a number the formula no longer uses."""
     from proofforge_evidence import risk as risk_module
 
-    monkeypatch.setattr(risk_module, "NO_TESTS_PENALTY", 33)
+    monkeypatch.setattr(risk_module, "UNMEASURED_TESTS_PENALTY", 33)
     monkeypatch.setattr(risk_module, "UNMEASURED_PENALTY", 7)
 
     engine = EvidenceEngine(EmptyToolchain())
@@ -172,4 +173,30 @@ def test_reasons_quote_the_weights_actually_used(tmp_path, monkeypatch) -> None:
 
     assert "+33" in reasons
     assert "+7" in reasons
-    assert "+50" not in reasons
+    assert "+20" not in reasons
+
+
+class TestsRanButEmptyToolchain(EmptyToolchain):
+    """The runner worked; the repository simply has no tests."""
+
+    def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
+        empty_junit = '<testsuite tests="0" failures="0" errors="0" skipped="0" time="0"/>'
+        return RawOutput(status="ok", text=empty_junit), RawOutput(status="unavailable")
+
+
+def test_unrunnable_tests_cost_less_than_a_repo_without_tests(tmp_path) -> None:
+    """Our inability to run tests is not a verdict on the repository."""
+    unrunnable = EvidenceEngine(EmptyToolchain()).run(
+        tmp_path / "a", _context(), tmp_path / "bundle-a"
+    )
+    no_tests = EvidenceEngine(TestsRanButEmptyToolchain()).run(
+        tmp_path / "b", _context(), tmp_path / "bundle-b"
+    )
+
+    assert unrunnable.manifest["risk"]["score"] < no_tests.manifest["risk"]["score"]
+
+    unrunnable_reasons = " ".join(unrunnable.manifest["risk"]["reasons"])
+    assert "reflects the runner, not the repository" in unrunnable_reasons
+
+    no_tests_reasons = " ".join(no_tests.manifest["risk"]["reasons"])
+    assert "found no tests" in no_tests_reasons
