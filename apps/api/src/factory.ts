@@ -4,7 +4,12 @@
  * Storage selection: PostgreSQL when DATABASE_URL is set, otherwise the
  * in-memory backend (local development, tests). Both satisfy the same contract.
  */
-import { InMemoryStorage, type Storage } from "@proofforge/database";
+import {
+  DrizzleStorage,
+  InMemoryStorage,
+  createDbClient,
+  type Storage,
+} from "@proofforge/database";
 import { InstallationTokenProvider, RestGitHubClient } from "@proofforge/github";
 import type { Config } from "./config.js";
 import type { AppDeps } from "./deps.js";
@@ -15,12 +20,20 @@ import { PythonEvidenceProducer } from "./services/evidence-producer.js";
 import { GitHubPublisher } from "./services/github-publisher.js";
 
 export function createDeps(config: Config, storage?: Storage): AppDeps {
-  const store = storage ?? new InMemoryStorage();
+  const store = storage ?? createStorage(config);
   const events = new EventBus();
   const runner = new AnalysisRunner(store, events, config.pipelineStepMs, createEvidencePipeline(config));
   const publisher = createPublisher(config, store);
 
   return { storage: store, events, runner, config, ...(publisher ? { publisher } : {}) };
+}
+
+/** PostgreSQL when DATABASE_URL is set, otherwise the in-memory backend. */
+function createStorage(config: Config): Storage {
+  if (config.databaseUrl === undefined || config.databaseUrl === "") {
+    return new InMemoryStorage();
+  }
+  return new DrizzleStorage(createDbClient(config.databaseUrl));
 }
 
 /** Only wired when the evidence engine's location is configured. */

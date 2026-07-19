@@ -4,6 +4,7 @@
 export * as schema from "./schema.js";
 export { createDbClient, type Database } from "./client.js";
 export { InMemoryStorage } from "./memory.js";
+export { DrizzleStorage } from "./drizzle-storage.js";
 export type {
   Storage,
   Session,
