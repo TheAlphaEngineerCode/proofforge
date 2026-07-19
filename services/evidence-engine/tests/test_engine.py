@@ -157,3 +157,19 @@ def test_unmeasured_security_signals_raise_risk(tmp_path) -> None:
     risk = result.manifest["risk"]
     assert risk["score"] > 0
     assert any("not measured" in reason for reason in risk["reasons"])
+
+
+def test_reasons_quote_the_weights_actually_used(tmp_path, monkeypatch) -> None:
+    """A reason must never quote a number the formula no longer uses."""
+    from proofforge_evidence import risk as risk_module
+
+    monkeypatch.setattr(risk_module, "NO_TESTS_PENALTY", 33)
+    monkeypatch.setattr(risk_module, "UNMEASURED_PENALTY", 7)
+
+    engine = EvidenceEngine(EmptyToolchain())
+    result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
+    reasons = " ".join(result.manifest["risk"]["reasons"])
+
+    assert "+33" in reasons
+    assert "+7" in reasons
+    assert "+50" not in reasons

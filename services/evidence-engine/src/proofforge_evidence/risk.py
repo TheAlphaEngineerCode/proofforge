@@ -41,6 +41,21 @@ SECURITY_COLLECTORS = frozenset({"secrets", "sast", "vulnerabilities"})
 #: an actual finding, and it should not by itself dominate the score.
 UNMEASURED_PENALTY = 8
 
+# Every weight lives here so the score can be calibrated in one place, and every
+# reason string derives from these values — a message must never quote a number
+# the formula no longer uses. Keep docs/risk-score.md in step.
+CRITICAL_VULN_PENALTY = 40
+HIGH_VULN_PENALTY = 15
+HIGH_SAST_PENALTY = 10
+SECRET_PENALTY = 30
+FAILED_TEST_PENALTY = 25
+COVERAGE_TARGET = 90.0
+
+#: Charged when no test evidence exists at all. This is the heaviest single term
+#: in the model: tests are the primary evidence that a change does what it claims,
+#: so their absence dominates the score by design.
+NO_TESTS_PENALTY = 50
+
 
 def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
     """Return a manifest ``risk`` object derived from the evidence."""
@@ -50,10 +65,10 @@ def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
     tests = evidence.tests
 
     findings_score = (
-        sec.vulnerabilities.critical * 40
-        + sec.vulnerabilities.high * 15
-        + sec.sast.high * 10
-        + sec.secrets_detected * 30
+        sec.vulnerabilities.critical * CRITICAL_VULN_PENALTY
+        + sec.vulnerabilities.high * HIGH_VULN_PENALTY
+        + sec.sast.high * HIGH_SAST_PENALTY
+        + sec.secrets_detected * SECRET_PENALTY
     )
 
     # A scanner that never ran produces the same zero as a clean scan. Charging
@@ -69,9 +84,12 @@ def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
     security_score = _clamp(findings_score + len(unmeasured) * UNMEASURED_PENALTY)
 
     if sec.vulnerabilities.critical:
-        reasons.append(f"{sec.vulnerabilities.critical} critical vulnerabilities (+40 each).")
+        reasons.append(
+            f"{sec.vulnerabilities.critical} critical vulnerabilities "
+            f"(+{CRITICAL_VULN_PENALTY} each)."
+        )
     if sec.secrets_detected:
-        reasons.append(f"{sec.secrets_detected} secrets detected (+30 each).")
+        reasons.append(f"{sec.secrets_detected} secrets detected (+{SECRET_PENALTY} each).")
     if unmeasured:
         reasons.append(
             f"{len(unmeasured)} security signals were not measured "
@@ -79,15 +97,20 @@ def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
         )
 
     if tests.collected:
-        coverage_gap = max(0.0, 90.0 - tests.coverage_total)
-        tests_score = _clamp(tests.failed * 25 + int(coverage_gap))
+        coverage_gap = max(0.0, COVERAGE_TARGET - tests.coverage_total)
+        tests_score = _clamp(tests.failed * FAILED_TEST_PENALTY + int(coverage_gap))
         if tests.failed:
-            reasons.append(f"{tests.failed} failing tests (+25 each).")
-        if tests.coverage_total < 90:
-            reasons.append(f"Coverage {tests.coverage_total:.1f}% below the 90% guideline.")
+            reasons.append(f"{tests.failed} failing tests (+{FAILED_TEST_PENALTY} each).")
+        if tests.coverage_total < COVERAGE_TARGET:
+            reasons.append(
+                f"Coverage {tests.coverage_total:.1f}% below the "
+                f"{COVERAGE_TARGET:.0f}% guideline."
+            )
     else:
-        tests_score = 50
-        reasons.append("No test evidence collected (+50): unable to confirm behavior.")
+        tests_score = NO_TESTS_PENALTY
+        reasons.append(
+            f"No test evidence collected (+{NO_TESTS_PENALTY}): unable to confirm behavior."
+        )
 
     categories = {
         "security": security_score,
