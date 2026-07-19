@@ -165,14 +165,18 @@ async function upsertEnv(values) {
   const lines = current.split(/\r?\n/);
 
   for (const [key, value] of Object.entries(values)) {
-    const rendered = `${key}=${value}`;
+    // Quote every value: the PEM contains spaces, which breaks any consumer that
+    // sources the file as shell. Backslashes are left alone so the escaped
+    // newlines in the key survive for the API to unescape.
+    const rendered = `${key}="${String(value).replace(/"/g, '\\"')}"`;
     const index = lines.findIndex((line) => line.startsWith(`${key}=`));
     if (index === -1) lines.push(rendered);
     else lines[index] = rendered;
   }
 
   while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-  await writeFile(path, `${lines.join("\n")}\n`);
+  // Owner-only: this file now holds the client secret and the private key.
+  await writeFile(path, `${lines.join("\n")}\n`, { mode: 0o600 });
 }
 
 function formPage(manifest, state) {

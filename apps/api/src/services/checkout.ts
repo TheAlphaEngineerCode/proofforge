@@ -59,7 +59,12 @@ export class GitRepositoryCheckout implements RepositoryCheckout {
       await this.git(dir, ["init", "--quiet"]);
       // Fetch straight from the URL rather than registering a remote: `git remote
       // add` would write the credentialed URL into .git/config, putting the token
-      // on disk. This way it exists only in this argument vector.
+      // on disk for the life of the checkout.
+      //
+      // The token still appears in this process's argv, which other processes of
+      // the same user can read while the fetch runs. Removing that too means an
+      // askpass helper or credential daemon; worth doing before this runs on
+      // shared hosts, but not while the exposure is a short-lived local subprocess.
       await this.git(dir, ["fetch", "--depth", "1", "--quiet", remote, request.commitSha]);
       await this.git(dir, ["checkout", "--quiet", "FETCH_HEAD"]);
     } catch (err) {
