@@ -82,7 +82,10 @@ export function buildAnalysisManifest(params: AnalysisManifestParams): Manifest 
       score: params.riskScore,
       level: params.riskLevel,
       categories: {},
-      reasons: ["Simulated API pipeline; evidence engine wiring lands in a later phase."],
+      reasons: [
+        "Simulated evidence: the evidence engine was not available for this run, " +
+          "so no collectors were executed.",
+      ],
     },
     policies: {},
     evidenceHash: `sha256:${"0".repeat(64)}`,

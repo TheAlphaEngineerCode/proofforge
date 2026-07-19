@@ -39,4 +39,5 @@ Thumbs.db
 
 # ProofForge local artifacts
 .proofforge/
+.proofforge-bundle/
 proof-artifacts/

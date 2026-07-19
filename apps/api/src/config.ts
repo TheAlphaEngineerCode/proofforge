@@ -11,6 +11,12 @@ const ConfigSchema = z.object({
   /** Milliseconds between simulated pipeline steps (0 in tests for speed). */
   pipelineStepMs: z.coerce.number().int().nonnegative().default(400),
 
+  /**
+   * Path to services/evidence-engine. When set, analyses check the commit out and
+   * collect real evidence; otherwise a simulated manifest is produced.
+   */
+  evidenceEngineDir: z.string().default(""),
+
   // GitHub App. Absent values simply disable the integration.
   githubAppId: z.string().default(""),
   githubPrivateKey: z.string().default(""),
@@ -29,6 +35,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     devLogin: env.AUTH_DEV_LOGIN,
     webOrigin: env.WEB_BASE_URL,
     pipelineStepMs: env.PIPELINE_STEP_MS,
+    evidenceEngineDir: env.EVIDENCE_ENGINE_DIR,
     githubAppId: env.GITHUB_APP_ID,
     githubPrivateKey: env.GITHUB_APP_PRIVATE_KEY,
     githubWebhookSecret: env.GITHUB_WEBHOOK_SECRET,

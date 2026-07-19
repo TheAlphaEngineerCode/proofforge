@@ -14,8 +14,24 @@ import {
   type AnalysisStatus,
   type RiskLevel,
 } from "@proofforge/shared-types";
+import type { Manifest } from "@proofforge/evidence-spec";
 import type { EventBus } from "../events.js";
 import { buildAnalysisManifest } from "../manifest.js";
+import type { RepositoryCheckout } from "./checkout.js";
+import type { EvidenceProducer } from "./evidence-producer.js";
+
+/**
+ * Real evidence collection: check the commit out, then run the engine over it.
+ * Absent when neither is configured, in which case a simulated manifest is used.
+ */
+export interface EvidencePipeline {
+  checkout: RepositoryCheckout;
+  producer: EvidenceProducer;
+}
+
+export interface RunnerLogger {
+  warn(message: string): void;
+}
 
 // The validation-mode pipeline: no planning/implementation (those are agent mode).
 const PIPELINE: readonly AnalysisStatus[] = [
@@ -32,6 +48,17 @@ const PIPELINE: readonly AnalysisStatus[] = [
 const sleep = (ms: number): Promise<void> =>
   ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Last line of defense before an error reaches the logs. The checkout already
+ * redacts its own failures, but anything carrying a credential must never be
+ * logged just because it arrived from somewhere else.
+ */
+function redactSecrets(message: string): string {
+  return message
+    .replace(/x-access-token:[^@\s]+@/g, "x-access-token:***@")
+    .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "***");
+}
+
 export class AnalysisRunner {
   private readonly inflight = new Map<string, Promise<void>>();
 
@@ -39,6 +66,8 @@ export class AnalysisRunner {
     private readonly storage: Storage,
     private readonly events: EventBus,
     private readonly stepMs: number,
+    private readonly evidence?: EvidencePipeline,
+    private readonly logger: RunnerLogger = { warn: (message) => console.warn(message) },
   ) {}
 
   /** Start the pipeline for an analysis. Returns a promise that resolves when it ends. */
@@ -115,21 +144,23 @@ export class AnalysisRunner {
     name: string,
     change: { commit: string; branch: string },
   ): Promise<void> {
-    // Interim risk for the simulated pipeline. Real scoring arrives with the
-    // Risk Engine (Phase 6) fed by the evidence engine's findings.
-    const riskScore = 18;
-    const riskLevel: RiskLevel = "low";
+    const manifest =
+      (await this.collectRealEvidence(owner, name, change)) ??
+      buildAnalysisManifest({
+        id: randomUUID(),
+        owner,
+        name,
+        commit: change.commit,
+        baseCommit: change.commit,
+        branch: change.branch,
+        // Interim placeholder risk; the engine supplies real scoring when available,
+        // and the Risk Engine (Phase 6) supersedes both.
+        riskScore: 18,
+        riskLevel: "low",
+      });
 
-    const manifest = buildAnalysisManifest({
-      id: randomUUID(),
-      owner,
-      name,
-      commit: change.commit,
-      baseCommit: change.commit,
-      branch: change.branch,
-      riskScore,
-      riskLevel,
-    });
+    const riskScore = manifest.risk.score;
+    const riskLevel = manifest.risk.level as RiskLevel;
 
     const bundle = await this.storage.createEvidenceBundle({
       analysisId,
@@ -145,5 +176,44 @@ export class AnalysisRunner {
       riskScore,
       riskLevel,
     });
+  }
+
+  /**
+   * Check the commit out and run the evidence engine over it. Any failure here —
+   * unreachable repository, missing engine, timeout — degrades to the simulated
+   * manifest instead of losing the analysis.
+   */
+  private async collectRealEvidence(
+    owner: string,
+    name: string,
+    change: { commit: string; branch: string },
+  ): Promise<Manifest | null> {
+    const pipeline = this.evidence;
+    if (!pipeline) return null;
+
+    let checkout: Awaited<ReturnType<RepositoryCheckout["fetch"]>> | undefined;
+    try {
+      checkout = await pipeline.checkout.fetch({
+        owner,
+        repo: name,
+        commitSha: change.commit,
+      });
+      return await pipeline.producer.produce({
+        repoPath: checkout.path,
+        owner,
+        name,
+        commitSha: change.commit,
+        baseSha: change.commit,
+        branch: change.branch,
+      });
+    } catch (err) {
+      const message = redactSecrets(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[evidence] falling back to a simulated manifest for ${owner}/${name}@${change.commit.slice(0, 7)}: ${message}`,
+      );
+      return null;
+    } finally {
+      await checkout?.dispose();
+    }
   }
 }

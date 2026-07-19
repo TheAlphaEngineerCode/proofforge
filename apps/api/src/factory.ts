@@ -9,16 +9,27 @@ import { InstallationTokenProvider, RestGitHubClient } from "@proofforge/github"
 import type { Config } from "./config.js";
 import type { AppDeps } from "./deps.js";
 import { EventBus } from "./events.js";
-import { AnalysisRunner } from "./services/analysis-runner.js";
+import { AnalysisRunner, type EvidencePipeline } from "./services/analysis-runner.js";
+import { GitRepositoryCheckout } from "./services/checkout.js";
+import { PythonEvidenceProducer } from "./services/evidence-producer.js";
 import { GitHubPublisher } from "./services/github-publisher.js";
 
 export function createDeps(config: Config, storage?: Storage): AppDeps {
   const store = storage ?? new InMemoryStorage();
   const events = new EventBus();
-  const runner = new AnalysisRunner(store, events, config.pipelineStepMs);
+  const runner = new AnalysisRunner(store, events, config.pipelineStepMs, createEvidencePipeline(config));
   const publisher = createPublisher(config, store);
 
   return { storage: store, events, runner, config, ...(publisher ? { publisher } : {}) };
+}
+
+/** Only wired when the evidence engine's location is configured. */
+function createEvidencePipeline(config: Config): EvidencePipeline | undefined {
+  if (config.evidenceEngineDir === "") return undefined;
+  return {
+    checkout: new GitRepositoryCheckout(),
+    producer: new PythonEvidenceProducer({ engineDir: config.evidenceEngineDir }),
+  };
 }
 
 /** Only wired when the GitHub App credentials are present. */
