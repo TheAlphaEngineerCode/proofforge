@@ -52,8 +52,13 @@ def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
 
     # A scanner that never ran produces the same zero as a clean scan. Charging
     # for the difference is the whole point: silence is not evidence of safety.
+    # A set, so a collector reported twice is still charged once.
     unmeasured = sorted(
-        run.name for run in evidence.runs if run.name in SECURITY_COLLECTORS and run.status != "ok"
+        {
+            run.name
+            for run in evidence.runs
+            if run.name in SECURITY_COLLECTORS and run.status != "ok"
+        }
     )
     security_score = _clamp(findings_score + len(unmeasured) * UNMEASURED_PENALTY)
 
