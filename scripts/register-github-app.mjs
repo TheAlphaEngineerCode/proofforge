@@ -123,7 +123,8 @@ function awaitRegistration(manifest, state) {
       res.end();
     });
 
-    server.listen(PORT, () => {
+    // Loopback only: this server briefly receives the App's private key.
+    server.listen(PORT, "127.0.0.1", () => {
       console.log(`\n  Open this and press "Create GitHub App":\n\n    http://localhost:${PORT}/\n`);
       console.log("  (log in as the account that should own the App)");
     });
@@ -161,7 +162,7 @@ async function persist(credentials, smeeUrl) {
 async function upsertEnv(values) {
   const path = join(ROOT, ".env");
   const current = await readFile(path, "utf8").catch(() => "");
-  const lines = current ? current.split(/\r?\n/) : [];
+  const lines = current.split(/\r?\n/);
 
   for (const [key, value] of Object.entries(values)) {
     const rendered = `${key}=${value}`;
@@ -170,7 +171,8 @@ async function upsertEnv(values) {
     else lines[index] = rendered;
   }
 
-  await writeFile(path, `${lines.filter((line, i, all) => line !== "" || i < all.length - 1).join("\n")}\n`);
+  while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  await writeFile(path, `${lines.join("\n")}\n`);
 }
 
 function formPage(manifest, state) {

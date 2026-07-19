@@ -52,17 +52,16 @@ export class GitRepositoryCheckout implements RepositoryCheckout {
       await rm(dir, { recursive: true, force: true }).catch(() => undefined);
     };
 
-    // The token lives only in this argument vector, never in git config or logs.
     const credentials = request.token ? `x-access-token:${request.token}@` : "";
     const remote = `https://${credentials}${this.gitHost}/${request.owner}/${request.repo}.git`;
 
     try {
       await this.git(dir, ["init", "--quiet"]);
-      await this.git(dir, ["remote", "add", "origin", remote]);
-      await this.git(dir, ["fetch", "--depth", "1", "--quiet", "origin", request.commitSha]);
+      // Fetch straight from the URL rather than registering a remote: `git remote
+      // add` would write the credentialed URL into .git/config, putting the token
+      // on disk. This way it exists only in this argument vector.
+      await this.git(dir, ["fetch", "--depth", "1", "--quiet", remote, request.commitSha]);
       await this.git(dir, ["checkout", "--quiet", "FETCH_HEAD"]);
-      // Drop the remote so the token cannot linger in the working copy's config.
-      await this.git(dir, ["remote", "remove", "origin"]);
     } catch (err) {
       await dispose();
       throw new Error(`checkout of ${request.owner}/${request.repo} failed: ${describe(err)}`);

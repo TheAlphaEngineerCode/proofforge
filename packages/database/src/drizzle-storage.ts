@@ -5,6 +5,7 @@
  * API is identical whichever one is running. Timestamps are stored as `timestamptz`
  * and surfaced as ISO strings, which is what the DTOs carry over the wire.
  */
+import { randomUUID } from "node:crypto";
 import { and, desc, eq, gt } from "drizzle-orm";
 import type {
   Analysis,
@@ -167,7 +168,7 @@ export class DrizzleStorage implements Storage {
   }
 
   async createSession(userId: string): Promise<Session> {
-    const token = crypto.randomUUID().replace(/-/g, "") + crypto.randomUUID().replace(/-/g, "");
+    const token = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
     const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
     await this.db.insert(schema.sessions).values({ token, userId, expiresAt });
     return { token, expiresAt: iso(expiresAt) };
