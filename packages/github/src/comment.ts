@@ -36,20 +36,24 @@ export function renderPullRequestComment(manifest: Manifest): string {
         : warn(`${tests.coverage.changedLines}% coverage on changed lines`),
     );
   }
-  // KNOWN GAP: a zero here reads the same whether the scanner ran and found
-  // nothing or never ran at all, so these lines can still overstate confidence.
-  // Fixing it properly means recording per-collector provenance in the manifest
-  // (which collectors executed, which were unavailable) — a spec change, not
-  // something to paper over with a guess here.
+  // A zero only means "clean" if the collector actually ran. Manifest provenance
+  // (spec 1.1.0) lets us say "not measured" instead of implying a pass.
+  const ran = (collector: string): boolean =>
+    manifest.collectors.some((entry) => entry.name === collector && entry.status === "ok");
+
   lines.push(
-    security.secretsDetected === 0
-      ? pass("No secrets detected")
-      : fail(`${security.secretsDetected} secrets detected`),
+    !ran("secrets")
+      ? warn("Secret scanning did not run — unverified")
+      : security.secretsDetected === 0
+        ? pass("No secrets detected")
+        : fail(`${security.secretsDetected} secrets detected`),
   );
   lines.push(
-    security.criticalVulnerabilities === 0
-      ? pass("No critical vulnerabilities")
-      : fail(`${security.criticalVulnerabilities} critical vulnerabilities`),
+    !ran("vulnerabilities")
+      ? warn("Vulnerability scanning did not run — unverified")
+      : security.criticalVulnerabilities === 0
+        ? pass("No critical vulnerabilities")
+        : fail(`${security.criticalVulnerabilities} critical vulnerabilities`),
   );
   if (security.highVulnerabilities > 0) {
     lines.push(warn(`${security.highVulnerabilities} high vulnerabilities`));

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://proofforge.dev/schema/proof-manifest/1.0.0.json",
-  "title": "ProofForge Proof Manifest 1.0.0",
+  "$id": "https://proofforge.dev/schema/proof-manifest/1.1.0.json",
+  "title": "ProofForge Proof Manifest 1.1.0",
   "type": "object",
   "properties": {
     "specVersion": {
@@ -573,6 +573,42 @@
         }
       },
       "additionalProperties": false
+    },
+    "collectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unavailable",
+              "error",
+              "timeout"
+            ]
+          },
+          "detail": {
+            "type": "string",
+            "default": ""
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "default": []
     },
     "agents": {
       "type": "array",

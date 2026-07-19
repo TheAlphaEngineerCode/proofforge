@@ -1,9 +1,18 @@
 import { ManifestSchema, computeEvidenceHash, type Manifest } from "@proofforge/evidence-spec";
 
+/** Every collector ran: the default fixture is measured-and-clean, not unmeasured. */
+const COLLECTORS_OK = ["tests", "secrets", "sast", "vulnerabilities", "sbom"].map((name) => ({
+  name,
+  status: "ok" as const,
+  detail: "",
+  durationMs: 10,
+}));
+
 /** A schema-valid manifest with clean evidence; override fields per test. */
 export function buildManifest(overrides: Partial<Manifest> = {}): Manifest {
   const manifest = ManifestSchema.parse({
-    specVersion: "1.0.0",
+    specVersion: "1.1.0",
+    collectors: COLLECTORS_OK,
     id: "b3f1c2a4-5d6e-4f70-8a91-2c3d4e5f6a7b",
     repository: { provider: "github", owner: "acme", name: "api", url: "https://github.com/acme/api" },
     change: {

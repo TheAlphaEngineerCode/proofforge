@@ -7,10 +7,12 @@
  */
 export {
   ManifestSchema,
+  CollectorRunSchema,
   RiskLevel,
   ChangeType,
   type Manifest,
   type ManifestInput,
+  type CollectorRun,
 } from "./schema.js";
 
 export {

@@ -41,6 +41,19 @@ describe("pull request comment — unmeasured evidence", () => {
     expect(body).toContain("88% coverage on changed lines");
   });
 
+  it("says a scanner did not run instead of implying a clean result", () => {
+    const manifest = buildManifest({
+      collectors: [{ name: "tests", status: "ok", detail: "", durationMs: 5 }],
+    });
+
+    const body = renderPullRequestComment(manifest);
+
+    expect(body).not.toContain("✓ No secrets detected");
+    expect(body).not.toContain("✓ No critical vulnerabilities");
+    expect(body).toContain("Secret scanning did not run");
+    expect(body).toContain("Vulnerability scanning did not run");
+  });
+
   it("reports failures as failures", () => {
     const manifest = buildManifest({
       tests: {

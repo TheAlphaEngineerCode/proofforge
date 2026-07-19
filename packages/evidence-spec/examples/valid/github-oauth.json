@@ -1,5 +1,5 @@
 {
-  "specVersion": "1.0.0",
+  "specVersion": "1.1.0",
   "id": "b3f1c2a4-5d6e-4f70-8a91-2c3d4e5f6a7b",
   "repository": {
     "provider": "github",
@@ -113,6 +113,7 @@
       }
     ]
   },
+  "collectors": [],
   "agents": [
     {
       "agentType": "planning",
@@ -126,7 +127,7 @@
     }
   ],
   "artifacts": [],
-  "evidenceHash": "sha256:b5d6f5b2283d475bc622757d405dfb7daf3960f056446007726fa7f1ac168b90",
+  "evidenceHash": "sha256:ac57139713d5b513d87a0f7892ba7e2754d85c3bc381c0ee386b49c2c3fed620",
   "signature": {
     "algorithm": "ed25519",
     "publicKeyId": "",

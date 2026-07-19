@@ -9,7 +9,7 @@ Reader = Callable[[str], str]
 
 REQUIRED_KEYS = {
     "specVersion", "id", "repository", "change", "environment", "tests", "security",
-    "quality", "performance", "operations", "risk", "policies", "agents", "artifacts",
+    "quality", "performance", "operations", "risk", "policies", "collectors", "agents", "artifacts",
     "evidenceHash", "signature", "createdAt",
 }
 
@@ -128,3 +128,32 @@ def test_all_unavailable_still_produces_valid_manifest(tmp_path: Path) -> None:
     assert manifest["tests"]["passed"] == 0
     # no test evidence → interim risk flags it
     assert manifest["risk"]["score"] >= 30
+
+
+def test_manifest_records_collector_provenance(tmp_path, read_fixture) -> None:
+    """A zero must be traceable to a collector that actually ran."""
+    engine = EvidenceEngine(FakeToolchain(read_fixture))
+    result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
+
+    collectors = result.manifest["collectors"]
+    assert {c["name"] for c in collectors} == {
+        "tests",
+        "secrets",
+        "sast",
+        "vulnerabilities",
+        "sbom",
+    }
+    assert all(c["status"] == "ok" for c in collectors)
+
+
+def test_unmeasured_security_signals_raise_risk(tmp_path) -> None:
+    """Silence is not evidence of safety: an absent scanner must cost something."""
+    engine = EvidenceEngine(EmptyToolchain())
+    result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
+
+    collectors = result.manifest["collectors"]
+    assert all(c["status"] == "unavailable" for c in collectors)
+
+    risk = result.manifest["risk"]
+    assert risk["score"] > 0
+    assert any("not measured" in reason for reason in risk["reasons"])

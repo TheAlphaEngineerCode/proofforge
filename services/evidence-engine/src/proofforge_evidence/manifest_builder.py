@@ -100,6 +100,18 @@ def build_manifest(
         },
         "risk": compute_interim_risk(evidence),
         "policies": {"passed": [], "failed": [], "warnings": []},
+        # Provenance: which collectors ran and which could not. Without this a
+        # zero in the counters above is ambiguous, and consumers would read
+        # "never measured" as "verified clean".
+        "collectors": [
+            {
+                "name": run.name,
+                "status": run.status,
+                "detail": run.detail,
+                "durationMs": run.duration_ms,
+            }
+            for run in evidence.runs
+        ],
         "agents": [],
         "artifacts": refs,
         "evidenceHash": "",

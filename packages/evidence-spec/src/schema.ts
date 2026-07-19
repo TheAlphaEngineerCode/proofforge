@@ -188,6 +188,25 @@ const SignatureSchema = z
  * The proof-manifest. `evidenceHash` and `signature.value` are excluded from the
  * hash computation (see src/hash.ts) so the document can carry its own digest.
  */
+/**
+ * What each collector actually did.
+ *
+ * Without this, a zero in the security counters is ambiguous: it reads the same
+ * whether a scanner ran and found nothing or never ran at all. Consumers must be
+ * able to tell "verified clean" from "not measured", and the risk score must
+ * charge for the difference rather than reward silence.
+ */
+export const CollectorRunSchema = z
+  .object({
+    name: z.string().min(1),
+    status: z.enum(["ok", "unavailable", "error", "timeout"]),
+    detail: z.string().default(""),
+    durationMs: z.number().int().nonnegative().default(0),
+  })
+  .strict();
+
+export type CollectorRun = z.infer<typeof CollectorRunSchema>;
+
 export const ManifestSchema = z
   .object({
     specVersion: z.string().regex(/^\d+\.\d+\.\d+$/),
@@ -202,6 +221,8 @@ export const ManifestSchema = z
     operations: OperationsSchema,
     risk: RiskSchema,
     policies: PoliciesSchema,
+    /** Provenance for every collector the engine attempted. */
+    collectors: z.array(CollectorRunSchema).default([]),
     agents: z.array(AgentSummarySchema).default([]),
     artifacts: z.array(ArtifactRefSchema).default([]),
     evidenceHash: sha256Hash,

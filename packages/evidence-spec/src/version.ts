@@ -6,8 +6,13 @@
  * backward compatible by contract (new optional fields only).
  */
 
-/** The specification version this library produces and fully understands. */
-export const SPEC_VERSION = "1.0.0" as const;
+/**
+ * The specification version this library produces and fully understands.
+ *
+ * 1.1.0 adds `collectors`, recording which collectors ran and which did not, so
+ * an unmeasured signal can be told apart from a clean one.
+ */
+export const SPEC_VERSION = "1.1.0" as const;
 
 /** MAJOR versions this library can validate. */
 export const SUPPORTED_MAJOR_VERSIONS: readonly number[] = [1];
