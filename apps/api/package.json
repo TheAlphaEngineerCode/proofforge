@@ -17,7 +17,7 @@
     "clean": "rimraf dist coverage .turbo"
   },
   "dependencies": {
-    "@fastify/cors": "^10.0.2",
+    "@fastify/cors": "^11.3.0",
     "@proofforge/database": "workspace:*",
     "@proofforge/evidence-spec": "workspace:*",
     "@proofforge/shared-types": "workspace:*",
