@@ -15,6 +15,7 @@ import {
   type Decision,
   type PolicyReport,
   type RuleOutcome,
+  type Severity,
 } from "@proofforge/policy-engine";
 import type { AnalysisStatus } from "@proofforge/shared-types";
 
@@ -91,5 +92,3 @@ function toOutcome(outcome: RuleOutcome): { rule: string; message: string; sever
       : `${outcome.message} (approved by ${outcome.waivedBy})`;
   return { rule: outcome.rule, message, severity: outcome.severity };
 }
-
-type Severity = "info" | "low" | "medium" | "high" | "critical";

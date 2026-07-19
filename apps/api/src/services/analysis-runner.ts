@@ -109,7 +109,12 @@ export class AnalysisRunner {
           });
         }
 
-        if (status === "POLICY_VALIDATION" && manifest !== undefined) {
+        if (status === "POLICY_VALIDATION") {
+          // Reaching here without a manifest means evidence generation was
+          // skipped, which would silently leave the analysis with no bundle.
+          if (manifest === undefined) {
+            throw new Error("reached policy validation with no manifest to evaluate");
+          }
           // The policy writes its outcomes into the manifest, so the bundle is
           // persisted only after this — one write, and a hash that matches.
           finalStatus = await this.applyPolicy(analysisId, repository.organizationId, manifest);
