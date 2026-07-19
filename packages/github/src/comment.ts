@@ -18,16 +18,29 @@ export function renderPullRequestComment(manifest: Manifest): string {
   const verdict = evaluateManifest(manifest);
   const lines: string[] = [];
 
-  lines.push(
-    tests.failed === 0
-      ? pass(`${tests.passed} tests passed`)
-      : fail(`${tests.failed} tests failed (${tests.passed} passed)`),
-  );
-  lines.push(
-    tests.coverage.changedLines >= 80
-      ? pass(`${tests.coverage.changedLines}% coverage on changed lines`)
-      : warn(`${tests.coverage.changedLines}% coverage on changed lines`),
-  );
+  // "No tests ran" is not a pass. Reporting an absent measurement as a green
+  // check is the one thing this product must never do — the whole premise is
+  // that a change is trusted only on evidence that exists.
+  const testsRan = tests.passed + tests.failed + tests.skipped > 0;
+  if (!testsRan) {
+    lines.push(warn("No tests were executed — behaviour is unverified"));
+  } else {
+    lines.push(
+      tests.failed === 0
+        ? pass(`${tests.passed} tests passed`)
+        : fail(`${tests.failed} tests failed (${tests.passed} passed)`),
+    );
+    lines.push(
+      tests.coverage.changedLines >= 80
+        ? pass(`${tests.coverage.changedLines}% coverage on changed lines`)
+        : warn(`${tests.coverage.changedLines}% coverage on changed lines`),
+    );
+  }
+  // KNOWN GAP: a zero here reads the same whether the scanner ran and found
+  // nothing or never ran at all, so these lines can still overstate confidence.
+  // Fixing it properly means recording per-collector provenance in the manifest
+  // (which collectors executed, which were unavailable) — a spec change, not
+  // something to paper over with a guess here.
   lines.push(
     security.secretsDetected === 0
       ? pass("No secrets detected")

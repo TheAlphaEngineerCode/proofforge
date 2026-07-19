@@ -19,6 +19,12 @@ export interface PublishTarget extends RepoRef {
   headSha: string;
   /** Present for pull requests; absent for plain pushes. */
   pullRequest?: number;
+  /**
+   * Set when the check run for this commit was already published by an earlier
+   * event, so a later one can add the pull request comment without producing a
+   * second, duplicate check run.
+   */
+  commentOnly?: boolean;
 }
 
 export interface Logger {
@@ -40,18 +46,20 @@ export class GitHubPublisher {
         return;
       }
 
-      const check = mapManifestToCheckRun(manifest);
-      await this.client.createCheckRun({
-        owner: target.owner,
-        repo: target.repo,
-        installationId: target.installationId,
-        headSha: target.headSha,
-        name: "ProofForge",
-        status: "completed",
-        conclusion: check.conclusion,
-        title: check.title,
-        summary: check.summary,
-      });
+      if (target.commentOnly !== true) {
+        const check = mapManifestToCheckRun(manifest);
+        await this.client.createCheckRun({
+          owner: target.owner,
+          repo: target.repo,
+          installationId: target.installationId,
+          headSha: target.headSha,
+          name: "ProofForge",
+          status: "completed",
+          conclusion: check.conclusion,
+          title: check.title,
+          summary: check.summary,
+        });
+      }
 
       if (target.pullRequest !== undefined) {
         await upsertVerificationComment(

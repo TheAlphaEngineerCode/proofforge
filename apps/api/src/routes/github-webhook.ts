@@ -136,12 +136,33 @@ async function startAnalysis(
     return { status: "ignored", reason: "repository is not connected to ProofForge" };
   }
 
+  const publisher = deps.publisher;
+  const installationId = input.installationId;
+
   // GitHub redelivers webhooks, and evidence is bound to a commit — so the same
   // commit must never spawn a second analysis. Reuse the existing one instead.
   const existing = (await deps.storage.listAnalyses(repository.id)).find(
     (candidate) => candidate.commitSha === input.headSha,
   );
   if (existing) {
+    // Pushing to a pull request fires `push` (no PR number) and `pull_request`
+    // for the same commit, and the push usually wins the race. Skipping the
+    // second event entirely would mean the pull request never gets its comment,
+    // so publish it here — the check run already exists, so only comment.
+    if (publisher && installationId !== null && input.pullRequest !== undefined) {
+      const target: PublishTarget = {
+        owner: input.owner,
+        repo: input.repo,
+        installationId,
+        headSha: input.headSha,
+        pullRequest: input.pullRequest,
+        commentOnly: true,
+      };
+      void deps.runner
+        .wait(existing.id)
+        .then(() => publisher.publish(target, existing.id))
+        .catch(() => {});
+    }
     return { status: "already_analyzed", analysisId: existing.id };
   }
 
@@ -150,8 +171,6 @@ async function startAnalysis(
     commitSha: input.headSha,
   });
 
-  const publisher = deps.publisher;
-  const installationId = input.installationId;
   const run = deps.runner.start(analysis.id);
 
   if (publisher && installationId !== null) {
