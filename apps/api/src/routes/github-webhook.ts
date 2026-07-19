@@ -162,7 +162,9 @@ async function startAnalysis(
       headSha: input.headSha,
       ...(input.pullRequest === undefined ? {} : { pullRequest: input.pullRequest }),
     };
-    void run.then(() => publisher.publish(target, analysis.id));
+    // Fire-and-forget, but never unhandled: the runner and publisher swallow their
+    // own errors today, and this keeps that true if either ever stops doing so.
+    void run.then(() => publisher.publish(target, analysis.id)).catch(() => {});
   }
 
   return { status: "analysis_started", analysisId: analysis.id };
