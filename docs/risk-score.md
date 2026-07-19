@@ -25,10 +25,18 @@ Each category scores 0–100 and is then clamped.
 | High vulnerability | +15 each |
 | High-severity SAST finding | +10 each |
 | Secret detected | +30 each |
-| **Security signal not measured** | **+12 each** |
+| **Security signal not measured** | **+8 each** |
 
 The unmeasured penalty applies once per collector in `{secrets, sast,
-vulnerabilities, sbom}` whose status is not `ok`.
+vulnerabilities}` whose status is not `ok`.
+
+SBOM is deliberately excluded: it is an inventory artifact, not a detector. Its
+absence limits what can be audited later, but it does not leave "is this change
+vulnerable?" unanswered the way a missing scanner does.
+
+The penalty is moderate on purpose. Unmeasured is a real gap, but it is weaker
+evidence of danger than an actual finding, and it should not on its own dominate
+the score.
 
 ### Tests
 
@@ -62,15 +70,19 @@ overall = clamp(round(0.6 × worst_category + 0.4 × mean_of_categories))
 A repository analyzed on a host with no scanners installed and no sandbox image:
 
 ```
-security: 4 unmeasured × 12                    = 48
+security: 3 unmeasured × 8                     = 24
 tests:    no test evidence                     = 50
-worst = 50, mean = 49
-overall = round(0.6 × 50 + 0.4 × 49) = 50      → elevated
+worst = 50, mean = 37
+overall = round(0.6 × 50 + 0.4 × 37) = 45      → elevated
 ```
 
-Nothing was found — because nothing was looked at, and the score says so. Install
-the collectors and the same commit scores far lower, on evidence rather than
-silence.
+Nothing was found — because nothing was looked at, and the score says so.
+
+Note which term dominates: the missing test evidence (+50), not the missing
+scanners (+24). Even with every scanner running clean, a change with no tests
+still scores 40. That ordering is deliberate — tests are the primary evidence
+that a change behaves as intended — but it means tuning the security weights
+alone will not move a score much. The test weight is the lever that does.
 
 ## Reading the reasons
 

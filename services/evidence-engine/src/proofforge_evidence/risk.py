@@ -30,10 +30,16 @@ def _clamp(value: int) -> int:
 
 
 #: Collectors whose absence leaves a security question unanswered.
-SECURITY_COLLECTORS = frozenset({"secrets", "sast", "vulnerabilities", "sbom"})
+#:
+#: SBOM is deliberately absent: it is an inventory artifact, not a detector. Not
+#: having one limits what you can audit later, but it does not leave "is this
+#: change vulnerable?" unanswered the way a missing scanner does.
+SECURITY_COLLECTORS = frozenset({"secrets", "sast", "vulnerabilities"})
 
-#: Charged once per security signal the run could not measure.
-UNMEASURED_PENALTY = 12
+#: Charged once per security signal the run could not measure. Deliberately
+#: moderate: unmeasured is a real gap, but it is weaker evidence of danger than
+#: an actual finding, and it should not by itself dominate the score.
+UNMEASURED_PENALTY = 8
 
 
 def compute_interim_risk(evidence: ConsolidatedEvidence) -> dict[str, object]:
