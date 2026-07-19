@@ -1,0 +1,8 @@
+{
+  "results": [
+    { "check_id": "a", "extra": { "severity": "ERROR" } },
+    { "check_id": "b", "extra": { "severity": "WARNING" } },
+    { "check_id": "c", "extra": { "severity": "INFO" } }
+  ],
+  "errors": []
+}

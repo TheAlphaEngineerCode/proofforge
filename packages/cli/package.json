@@ -1,0 +1,31 @@
+{
+  "name": "@proofforge/cli",
+  "version": "0.1.0",
+  "description": "ProofForge command-line interface for validating and inspecting proof-manifests.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "proofforge": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "start": "node dist/index.js",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rimraf dist coverage .turbo"
+  },
+  "dependencies": {
+    "@proofforge/evidence-spec": "workspace:*",
+    "commander": "^13.0.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

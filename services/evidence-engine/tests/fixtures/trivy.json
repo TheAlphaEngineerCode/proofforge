@@ -1,0 +1,14 @@
+{
+  "Results": [
+    {
+      "Target": "package-lock.json",
+      "Vulnerabilities": [
+        { "VulnerabilityID": "CVE-1", "Severity": "CRITICAL" },
+        { "VulnerabilityID": "CVE-2", "Severity": "HIGH" },
+        { "VulnerabilityID": "CVE-3", "Severity": "MEDIUM" },
+        { "VulnerabilityID": "CVE-4", "Severity": "MEDIUM" },
+        { "VulnerabilityID": "CVE-5", "Severity": "LOW" }
+      ]
+    }
+  ]
+}

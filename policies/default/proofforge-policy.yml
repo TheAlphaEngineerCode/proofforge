@@ -1,0 +1,32 @@
+# ProofForge default policy set.
+# The Policy Engine (Phase 6) loads, validates and enforces these rules against a
+# manifest's evidence, producing violations that can block approval.
+version: "1.0"
+
+policies:
+  security:
+    max_critical_vulnerabilities: 0
+    max_high_vulnerabilities: 0
+    secrets_allowed: false
+    sbom_required: true
+
+  tests:
+    min_changed_lines_coverage: 85
+    max_failed_tests: 0
+    integration_tests_required: true
+
+  performance:
+    max_latency_regression_percent: 5
+    max_memory_regression_percent: 10
+
+  architecture:
+    forbid_cross_layer_imports: true
+    max_new_dependencies: 3
+
+  database:
+    reversible_migrations_required: true
+    destructive_migrations_require_approval: true
+
+  risk:
+    max_automatic_approval_score: 20
+    max_human_approval_score: 60

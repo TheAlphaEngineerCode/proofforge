@@ -1,0 +1,48 @@
+[project]
+name = "proofforge-repository-analyzer"
+version = "0.1.0"
+description = "ProofForge Repository Analyzer — detects languages, frameworks, dependencies and architecture."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+    "pydantic>=2.9",
+]
+
+[project.scripts]
+proofforge-analyzer = "proofforge_analyzer.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "mypy>=1.13",
+    "ruff>=0.8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/proofforge_analyzer"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["proofforge_analyzer"]
+mypy_path = "src"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+# Fixture repositories contain their own test files (test_*.py, *.test.js) that
+# must not be collected as part of the analyzer's own suite.
+norecursedirs = ["fixtures"]

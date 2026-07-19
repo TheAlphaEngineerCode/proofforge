@@ -1,0 +1,7 @@
+{
+  "artifacts": [
+    { "name": "express", "version": "4.19.2" },
+    { "name": "pg", "version": "8.13.1" }
+  ],
+  "schema": { "version": "16.0.0" }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "@proofforge/evidence-spec",
+  "version": "0.1.0",
+  "description": "Canonical schema, hashing and signature verification for the ProofForge proof-manifest.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./schema.json": "./schema/proof-manifest.schema.json"
+  },
+  "files": ["dist", "schema"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "generate:schema": "tsx scripts/generate-json-schema.ts",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rimraf dist coverage .turbo"
+  },
+  "dependencies": {
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

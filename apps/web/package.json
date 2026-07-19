@@ -1,0 +1,27 @@
+{
+  "name": "@proofforge/web",
+  "version": "0.1.0",
+  "description": "ProofForge dashboard (Next.js).",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf .next dist .turbo"
+  },
+  "dependencies": {
+    "@proofforge/evidence-spec": "workspace:*",
+    "@proofforge/shared-types": "workspace:*",
+    "next": "^15.1.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.4",
+    "@types/react-dom": "^19.0.2",
+    "typescript": "^5.7.3"
+  }
+}

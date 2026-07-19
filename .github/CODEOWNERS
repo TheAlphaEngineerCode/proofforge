@@ -1,0 +1,6 @@
+# Default owners for everything in the repo.
+# Replace with real GitHub handles/teams before enabling branch protection.
+* @proofforge/maintainers
+
+/packages/evidence-spec/ @proofforge/maintainers
+/.github/                 @proofforge/maintainers

@@ -1,0 +1,136 @@
+{
+  "specVersion": "1.0.0",
+  "id": "b3f1c2a4-5d6e-4f70-8a91-2c3d4e5f6a7b",
+  "repository": {
+    "provider": "github",
+    "owner": "proofforge",
+    "name": "example-node-api",
+    "url": "https://github.com/proofforge/example-node-api"
+  },
+  "change": {
+    "commit": "9c82fd1a2b3c4d5e6f708192a3b4c5d6e7f80912",
+    "baseCommit": "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+    "branch": "feature/github-oauth",
+    "pullRequest": 42,
+    "title": "Add GitHub OAuth authentication",
+    "request": "Add authentication with GitHub OAuth and limit each user to 100 requests/hour.",
+    "type": "agent"
+  },
+  "environment": {
+    "runnerVersion": "0.1.0",
+    "operatingSystem": "linux",
+    "containerImage": "ghcr.io/proofforge/sandbox-node@sha256:deadbeef",
+    "runtimeVersions": {
+      "node": "20.11.0",
+      "pnpm": "9.15.0"
+    },
+    "dependencyLockHashes": {
+      "pnpm-lock.yaml": "sha256:aa11bb22"
+    }
+  },
+  "tests": {
+    "passed": 184,
+    "failed": 0,
+    "skipped": 2,
+    "durationMs": 12000,
+    "coverage": {
+      "total": 86.2,
+      "changedLines": 92.4,
+      "before": 84.1,
+      "after": 86.2
+    },
+    "reports": []
+  },
+  "security": {
+    "criticalVulnerabilities": 0,
+    "highVulnerabilities": 0,
+    "mediumVulnerabilities": 2,
+    "lowVulnerabilities": 4,
+    "secretsDetected": 0,
+    "sbomGenerated": true,
+    "sbomUrl": "",
+    "reports": []
+  },
+  "quality": {
+    "complexityBefore": 10,
+    "complexityAfter": 11,
+    "duplicatedLinesPercentage": 1.2,
+    "newDependencies": [
+      {
+        "name": "@fastify/oauth2",
+        "version": "8.1.0",
+        "ecosystem": "npm"
+      }
+    ],
+    "removedDependencies": [],
+    "architectureViolations": []
+  },
+  "performance": {
+    "benchmarks": [
+      {
+        "name": "api-login",
+        "baselineMs": 118,
+        "candidateMs": 120,
+        "regressionPercentage": 1.7
+      }
+    ]
+  },
+  "operations": {
+    "migrationsDetected": true,
+    "migrationsReversible": true,
+    "rollbackAvailable": true,
+    "downtimeRequired": false
+  },
+  "risk": {
+    "score": 37,
+    "level": "moderate",
+    "categories": {
+      "security": 22,
+      "complexity": 48,
+      "dependencies": 35,
+      "database": 61,
+      "tests": 19
+    },
+    "reasons": [
+      "New OAuth dependency increases supply-chain surface (+8).",
+      "Reversible migration present, rollback available (-5).",
+      "Changed-line coverage 92.4% is above policy floor (-6)."
+    ]
+  },
+  "policies": {
+    "passed": [
+      {
+        "rule": "security.max_critical_vulnerabilities",
+        "message": "0 <= 0"
+      }
+    ],
+    "failed": [],
+    "warnings": [
+      {
+        "rule": "architecture.max_new_dependencies",
+        "message": "1 new dependency added",
+        "severity": "low"
+      }
+    ]
+  },
+  "agents": [
+    {
+      "agentType": "planning",
+      "provider": "none",
+      "model": "n/a"
+    },
+    {
+      "agentType": "reviewer",
+      "provider": "none",
+      "model": "n/a"
+    }
+  ],
+  "artifacts": [],
+  "evidenceHash": "sha256:b5d6f5b2283d475bc622757d405dfb7daf3960f056446007726fa7f1ac168b90",
+  "signature": {
+    "algorithm": "ed25519",
+    "publicKeyId": "",
+    "value": ""
+  },
+  "createdAt": "2026-07-18T12:00:00.000Z"
+}

@@ -1,0 +1,33 @@
+{
+  "name": "@proofforge/api",
+  "version": "0.1.0",
+  "description": "ProofForge REST API (Fastify).",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rimraf dist coverage .turbo"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@proofforge/database": "workspace:*",
+    "@proofforge/evidence-spec": "workspace:*",
+    "@proofforge/shared-types": "workspace:*",
+    "fastify": "^5.2.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

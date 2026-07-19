@@ -1,0 +1,3 @@
+[
+  { "RuleID": "generic-api-key", "File": "src/config.ts", "StartLine": 12 }
+]

@@ -1,0 +1,17 @@
+{
+  "specVersion": "1.0.0",
+  "id": "not-a-uuid",
+  "repository": {
+    "provider": "github",
+    "owner": "proofforge",
+    "name": "example-node-api",
+    "url": "https://github.com/proofforge/example-node-api"
+  },
+  "change": {
+    "commit": "9c82fd1",
+    "baseCommit": "1a2b3c4",
+    "branch": "feature/github-oauth",
+    "title": "Add GitHub OAuth authentication",
+    "request": ""
+  }
+}

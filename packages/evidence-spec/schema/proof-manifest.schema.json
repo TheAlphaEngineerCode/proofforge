@@ -1,0 +1,695 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://proofforge.dev/schema/proof-manifest/1.0.0.json",
+  "title": "ProofForge Proof Manifest 1.0.0",
+  "type": "object",
+  "properties": {
+    "specVersion": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "github",
+            "gitlab",
+            "bitbucket",
+            "local"
+          ]
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": [
+        "provider",
+        "owner",
+        "name",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "change": {
+      "type": "object",
+      "properties": {
+        "commit": {
+          "type": "string",
+          "minLength": 7
+        },
+        "baseCommit": {
+          "type": "string",
+          "minLength": 7
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pullRequest": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "validation",
+            "agent"
+          ],
+          "default": "validation"
+        }
+      },
+      "required": [
+        "commit",
+        "baseCommit",
+        "branch",
+        "title",
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "runnerVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operatingSystem": {
+          "type": "string",
+          "minLength": 1
+        },
+        "containerImage": {
+          "type": "string"
+        },
+        "runtimeVersions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "dependencyLockHashes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "runnerVersion",
+        "operatingSystem",
+        "containerImage",
+        "runtimeVersions",
+        "dependencyLockHashes"
+      ],
+      "additionalProperties": false
+    },
+    "tests": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "coverage": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "changedLines": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "before": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "after": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "total",
+            "changedLines"
+          ],
+          "additionalProperties": false
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string"
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "passed",
+        "failed",
+        "skipped",
+        "durationMs",
+        "coverage"
+      ],
+      "additionalProperties": false
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "criticalVulnerabilities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "highVulnerabilities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "mediumVulnerabilities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lowVulnerabilities": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "secretsDetected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sbomGenerated": {
+          "type": "boolean"
+        },
+        "sbomUrl": {
+          "type": "string",
+          "default": ""
+        },
+        "reports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "url": {
+                "type": "string"
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              }
+            },
+            "required": [
+              "name",
+              "type",
+              "url"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "criticalVulnerabilities",
+        "highVulnerabilities",
+        "mediumVulnerabilities",
+        "lowVulnerabilities",
+        "secretsDetected",
+        "sbomGenerated"
+      ],
+      "additionalProperties": false
+    },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "complexityBefore": {
+          "type": "number",
+          "minimum": 0
+        },
+        "complexityAfter": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duplicatedLinesPercentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "newDependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string"
+              },
+              "ecosystem": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "version",
+              "ecosystem"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "removedDependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "version": {
+                "type": "string"
+              },
+              "ecosystem": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "version",
+              "ecosystem"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "architectureViolations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "complexityBefore",
+        "complexityAfter",
+        "duplicatedLinesPercentage"
+      ],
+      "additionalProperties": false
+    },
+    "performance": {
+      "type": "object",
+      "properties": {
+        "benchmarks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "baselineMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "candidateMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "regressionPercentage": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "name",
+              "baselineMs",
+              "candidateMs",
+              "regressionPercentage"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "operations": {
+      "type": "object",
+      "properties": {
+        "migrationsDetected": {
+          "type": "boolean"
+        },
+        "migrationsReversible": {
+          "type": "boolean"
+        },
+        "rollbackAvailable": {
+          "type": "boolean"
+        },
+        "downtimeRequired": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "migrationsDetected",
+        "migrationsReversible",
+        "rollbackAvailable",
+        "downtimeRequired"
+      ],
+      "additionalProperties": false
+    },
+    "risk": {
+      "type": "object",
+      "properties": {
+        "score": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "low",
+            "moderate",
+            "elevated",
+            "high",
+            "critical"
+          ]
+        },
+        "categories": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "default": {}
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "required": [
+        "score",
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "policies": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              }
+            },
+            "required": [
+              "rule",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "failed": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              }
+            },
+            "required": [
+              "rule",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "rule": {
+                "type": "string",
+                "minLength": 1
+              },
+              "message": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string",
+                "enum": [
+                  "info",
+                  "low",
+                  "medium",
+                  "high",
+                  "critical"
+                ]
+              }
+            },
+            "required": [
+              "rule",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "agents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "agentType": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provider": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "promptHash": {
+            "type": "string"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outputTokens": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cost": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "agentType",
+          "provider",
+          "model"
+        ],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "evidenceHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "signature": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "const": "ed25519"
+        },
+        "publicKeyId": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "algorithm",
+        "publicKeyId",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "specVersion",
+    "id",
+    "repository",
+    "change",
+    "environment",
+    "tests",
+    "security",
+    "quality",
+    "performance",
+    "operations",
+    "risk",
+    "policies",
+    "evidenceHash",
+    "signature",
+    "createdAt"
+  ],
+  "additionalProperties": false
+}

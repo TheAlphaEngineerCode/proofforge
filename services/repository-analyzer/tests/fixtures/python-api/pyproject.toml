@@ -1,0 +1,20 @@
+[project]
+name = "sample-python-api"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "sqlalchemy>=2.0",
+    "asyncpg>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.mypy]
+strict = true
