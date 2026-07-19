@@ -1,19 +1,22 @@
 {
-  "name": "@proofforge/cli",
+  "name": "@proofforge/policy-engine",
   "version": "0.1.0",
-  "description": "ProofForge command-line interface for validating and inspecting proof-manifests.",
+  "description": "Loads YAML policies and evaluates a proof-manifest against them.",
   "license": "Apache-2.0",
   "type": "module",
-  "bin": {
-    "proofforge": "./dist/index.js"
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
-    "start": "node dist/index.js",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -22,9 +25,8 @@
   },
   "dependencies": {
     "@proofforge/evidence-spec": "workspace:*",
-    "commander": "^13.0.0",
-    "picocolors": "^1.1.1",
-    "@proofforge/policy-engine": "workspace:*"
+    "yaml": "^2.7.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "tsup": "^8.3.5",

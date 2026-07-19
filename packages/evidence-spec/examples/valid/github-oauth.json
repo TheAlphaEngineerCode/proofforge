@@ -113,7 +113,38 @@
       }
     ]
   },
-  "collectors": [],
+  "collectors": [
+    {
+      "name": "tests",
+      "status": "ok",
+      "detail": "vitest",
+      "durationMs": 12000
+    },
+    {
+      "name": "secrets",
+      "status": "ok",
+      "detail": "gitleaks",
+      "durationMs": 850
+    },
+    {
+      "name": "sast",
+      "status": "ok",
+      "detail": "semgrep",
+      "durationMs": 4300
+    },
+    {
+      "name": "vulnerabilities",
+      "status": "ok",
+      "detail": "trivy",
+      "durationMs": 6100
+    },
+    {
+      "name": "sbom",
+      "status": "ok",
+      "detail": "syft",
+      "durationMs": 2200
+    }
+  ],
   "agents": [
     {
       "agentType": "planning",
@@ -127,7 +158,7 @@
     }
   ],
   "artifacts": [],
-  "evidenceHash": "sha256:ac57139713d5b513d87a0f7892ba7e2754d85c3bc381c0ee386b49c2c3fed620",
+  "evidenceHash": "sha256:4c011faa708bf36f90f0db853f495b14636de79126b2381272181160bb8e9fc2",
   "signature": {
     "algorithm": "ed25519",
     "publicKeyId": "",

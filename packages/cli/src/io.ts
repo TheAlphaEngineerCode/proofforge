@@ -11,14 +11,18 @@ export class CliError extends Error {
   }
 }
 
-/** Read and JSON-parse a file, converting failures into a CliError. */
-export function readJsonFile(path: string): unknown {
-  let raw: string;
+/** Read a text file, converting failures into a CliError. */
+export function readTextFile(path: string): string {
   try {
-    raw = readFileSync(path, "utf8");
+    return readFileSync(path, "utf8");
   } catch {
     throw new CliError(`Cannot read file: ${path}`, ExitCode.UsageError);
   }
+}
+
+/** Read and JSON-parse a file, converting failures into a CliError. */
+export function readJsonFile(path: string): unknown {
+  const raw = readTextFile(path);
   try {
     return JSON.parse(raw);
   } catch (err) {

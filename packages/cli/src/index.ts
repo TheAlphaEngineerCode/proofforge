@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { SPEC_VERSION } from "@proofforge/evidence-spec";
 import { manifestInspect, manifestValidate } from "./commands/manifest.js";
 import { evidenceVerify } from "./commands/evidence.js";
+import { policyEvaluate, policyValidate } from "./commands/policy.js";
 import { runCommand } from "./run.js";
 
 const CLI_VERSION = "0.1.0";
@@ -73,13 +74,24 @@ for (const [name, description, phase] of planned) {
 }
 
 const policy = program.command("policy").description("Policy tooling");
+
 policy
   .command("validate")
-  .description("Validate a policy file (arrives in Phase 6)")
-  .argument("[file]", "path to a policy YAML file")
-  .action(() => {
-    process.stdout.write(`"proofforge policy validate" is planned for Phase 6 and is not available yet.\n`);
-    process.exitCode = 0;
+  .description("Validate a policy file against the policy schema")
+  .argument("<file>", "path to a policy YAML file")
+  .option("--json", "emit machine-readable JSON output", false)
+  .action((file: string, opts: { json: boolean }) => {
+    process.exitCode = runCommand(() => policyValidate(file, { json: opts.json }));
+  });
+
+policy
+  .command("evaluate")
+  .description("Evaluate a proof-manifest against a policy")
+  .argument("<policy>", "path to a policy YAML file")
+  .argument("<manifest>", "path to a proof-manifest JSON file")
+  .option("--json", "emit machine-readable JSON output", false)
+  .action((policyFile: string, manifestFile: string, opts: { json: boolean }) => {
+    process.exitCode = runCommand(() => policyEvaluate(policyFile, manifestFile, { json: opts.json }));
   });
 
 program.parseAsync(process.argv).catch((err: unknown) => {

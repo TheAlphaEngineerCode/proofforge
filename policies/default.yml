@@ -1,0 +1,30 @@
+# A reasonable starting point: blocks what is clearly unsafe, asks a human about
+# the rest. Copy it, tighten it, and keep it in the repository it governs.
+version: "1.0"
+name: default
+
+# What to do when a rule cannot be evaluated because its collector never ran.
+# `fail` is the safe default: a scanner that did not run has not cleared anything.
+# Teams still standing up their collectors often start at `warn` and tighten later.
+onUnverifiable: warn
+
+security:
+  maxCriticalVulnerabilities: 0
+  maxHighVulnerabilities: 5
+  secretsAllowed: false
+  sbomRequired: false
+
+tests:
+  maxFailedTests: 0
+  testsRequired: true
+  minChangedLinesCoverage: 70
+
+operations:
+  reversibleMigrationsRequired: true
+  downtimeAllowed: false
+
+risk:
+  # At or below this, ProofForge approves on its own.
+  maxAutomaticApprovalScore: 20
+  # Above this, no human approval is enough — the change must be reworked.
+  maxHumanApprovalScore: 75

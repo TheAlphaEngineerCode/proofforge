@@ -91,6 +91,16 @@ const input: ManifestInput = {
       { rule: "architecture.max_new_dependencies", message: "1 new dependency added", severity: "low" },
     ],
   },
+  // Provenance for the numbers above. Without it a consumer cannot tell a clean
+  // scan from a scan that never happened, and policy rules covering those signals
+  // are unverifiable rather than satisfied.
+  collectors: [
+    { name: "tests", status: "ok", detail: "vitest", durationMs: 12000 },
+    { name: "secrets", status: "ok", detail: "gitleaks", durationMs: 850 },
+    { name: "sast", status: "ok", detail: "semgrep", durationMs: 4300 },
+    { name: "vulnerabilities", status: "ok", detail: "trivy", durationMs: 6100 },
+    { name: "sbom", status: "ok", detail: "syft", durationMs: 2200 },
+  ],
   agents: [
     { agentType: "planning", provider: "none", model: "n/a" },
     { agentType: "reviewer", provider: "none", model: "n/a" },

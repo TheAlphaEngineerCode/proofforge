@@ -1,0 +1,35 @@
+# For code where a mistake is expensive. Nothing unmeasured passes: if a collector
+# did not run, the change does not move.
+version: "1.0"
+name: strict
+
+onUnverifiable: fail
+
+security:
+  maxCriticalVulnerabilities: 0
+  maxHighVulnerabilities: 0
+  secretsAllowed: false
+  sbomRequired: true
+
+tests:
+  maxFailedTests: 0
+  testsRequired: true
+  minChangedLinesCoverage: 85
+
+operations:
+  reversibleMigrationsRequired: true
+  downtimeAllowed: false
+
+risk:
+  maxAutomaticApprovalScore: 10
+  maxHumanApprovalScore: 60
+
+# Exceptions are how you say "we know, and we accepted it". Both fields are
+# required so that waiving a rule leaves a trace instead of quietly loosening the
+# policy for everyone. Prefer an expiry date.
+#
+# exceptions:
+#   - rule: security.sbomRequired
+#     reason: "SBOM generation blocked on vendor tooling, tracked in PLAT-412"
+#     approvedBy: "ana.silva"
+#     expiresAt: "2026-12-31T00:00:00Z"
