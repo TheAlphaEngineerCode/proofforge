@@ -37,7 +37,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     pipelineStepMs: env.PIPELINE_STEP_MS,
     evidenceEngineDir: env.EVIDENCE_ENGINE_DIR,
     githubAppId: env.GITHUB_APP_ID,
-    githubPrivateKey: env.GITHUB_APP_PRIVATE_KEY,
+    // A PEM cannot survive a single-line .env unless its newlines are escaped,
+    // so accept both the escaped and the literal form.
+    githubPrivateKey: env.GITHUB_APP_PRIVATE_KEY?.replace(/\\n/g, "\n"),
     githubWebhookSecret: env.GITHUB_WEBHOOK_SECRET,
     githubApiBaseUrl: env.GITHUB_API_BASE_URL,
   });

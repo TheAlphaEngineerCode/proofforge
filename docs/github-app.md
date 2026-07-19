@@ -15,9 +15,45 @@ requests, publishes a Check Run on the commit and posts (or updates) a verificat
 | Installation records | ✅ |
 | Idempotent deliveries (a commit is analyzed once) | ✅ |
 
-## Registering the App
+## Registering the App (automated)
 
-This step is manual — it needs your GitHub account.
+```bash
+make github-app     # or: node scripts/register-github-app.mjs
+```
+
+The script provisions a [smee.io](https://smee.io) channel so webhooks can reach a
+machine with no public address, then opens a page that hands GitHub a pre-filled
+**app manifest**. You press *Create GitHub App* once; GitHub returns the app id,
+private key and webhook secret, and the script writes them to `.env` and
+`.secrets/github-app.pem` (both git-ignored). Nothing is copied by hand.
+
+Permissions requested are the minimum the flow needs:
+
+| Permission | Why |
+| --- | --- |
+| `checks: write` | create and update the Check Run |
+| `contents: read` | clone the commit under analysis |
+| `metadata: read` | required of every App |
+| `pull_requests: write` | publish the verification comment |
+
+Events: `pull_request`, `push`, `check_suite`.
+
+Afterwards:
+
+```bash
+# 1. install the App on a repository (the script prints the URL)
+# 2. forward webhooks to your local API
+npx smee-client --url "$SMEE_URL" --target http://localhost:3001/api/v1/github/webhook
+# 3. run the API
+pnpm --filter @proofforge/api dev
+```
+
+Creating the App still requires your GitHub account and your click — that part
+cannot be automated away, and it is the only manual step.
+
+## Registering the App (manual alternative)
+
+If you would rather not use the manifest flow:
 
 1. **Settings → Developer settings → GitHub Apps → New GitHub App**.
 2. **Webhook URL**: `https://<your-host>/api/v1/github/webhook`

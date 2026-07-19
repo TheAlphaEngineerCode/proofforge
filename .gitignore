@@ -23,6 +23,9 @@ coverage/
 .env.local
 .env.*.local
 
+# Credentials written by scripts/register-github-app.mjs
+.secrets/
+
 # Python
 __pycache__/
 *.py[cod]

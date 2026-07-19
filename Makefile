@@ -53,3 +53,6 @@ db-reset: ## Reset the database (Phase 4)
 
 clean: ## Remove build output and caches
 	pnpm clean
+
+github-app: ## Register the GitHub App (one click, writes .env)
+	node scripts/register-github-app.mjs
