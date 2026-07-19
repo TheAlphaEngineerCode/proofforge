@@ -13,9 +13,39 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Protocol
 
+from proofforge_evidence import runners
 from proofforge_evidence.engine import RawOutput
-from proofforge_evidence.sandbox import docker_available
+from proofforge_evidence.sandbox import (
+    DockerSandbox,
+    Mount,
+    SandboxResult,
+    SandboxSpec,
+    docker_available,
+)
+
+
+class Sandbox(Protocol):
+    """Runs a spec to completion. Injectable so the wiring is testable without Docker."""
+
+    def run(self, spec: SandboxSpec) -> SandboxResult: ...
+
+
+def _unavailable(detail: str, status: str = "unavailable") -> RawOutput:
+    return RawOutput(status=status, detail=detail)
+
+
+def _both_unavailable(detail: str, status: str = "unavailable") -> tuple[RawOutput, RawOutput]:
+    return _unavailable(detail, status), _unavailable(detail, status)
+
+
+def _read_report(path: Path) -> str | None:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    return text if text.strip() else None
 
 _DEFAULT_TIMEOUT_S = 300
 
@@ -23,19 +53,68 @@ _DEFAULT_TIMEOUT_S = 300
 class HostToolchain:
     """Runs static scanners on the host; delegates test execution to the sandbox."""
 
-    def __init__(self, *, timeout_s: int = _DEFAULT_TIMEOUT_S) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_s: int = _DEFAULT_TIMEOUT_S,
+        sandbox: Sandbox | None = None,
+    ) -> None:
         self._timeout = timeout_s
+        self._sandbox: Sandbox = sandbox if sandbox is not None else DockerSandbox()
 
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
-        # Tests execute untrusted repository code, so they must run in the sandbox.
-        # We never fall back to the host. Wiring per-stack runner images is the
-        # remaining Phase 3 integration step; until then this reports cleanly.
+        """Run the repository's tests in a container and collect the reports.
+
+        Repository code is untrusted and never runs on the host: if the sandbox is
+        unavailable we report that and collect nothing.
+        """
         if not docker_available():
-            reason = "Docker unavailable; test code is never executed on the host"
-        else:
-            reason = "no sandbox runner image configured for the detected stack"
-        unavailable = RawOutput(status="unavailable", detail=reason)
-        return unavailable, unavailable
+            return _both_unavailable("Docker unavailable; test code never runs on the host")
+
+        try:
+            plan = runners.plan_for(runners.detect_stack(repo))
+        except runners.UnsupportedStackError as err:
+            return _both_unavailable(f"no supported test runner: {err}")
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            out = Path(out_dir)
+            spec = SandboxSpec(
+                image=plan.image,
+                command=[plan.script],
+                workdir=runners.WORK_DIR,
+                timeout_s=self._timeout,
+                # Dependency installation needs the network, so this is the one
+                # place the default network-off stance is relaxed. Everything else
+                # still holds: non-root, dropped capabilities, no new privileges,
+                # read-only root, CPU/memory/PID caps, and an ephemeral container.
+                network=True,
+                mounts=[
+                    Mount(host=repo, container=runners.SOURCE_MOUNT, read_only=True),
+                    Mount(host=out, container=runners.OUTPUT_DIR, read_only=False),
+                ],
+                writable_volumes=[runners.WORK_DIR],
+            )
+
+            result = self._sandbox.run(spec)
+            if result.timed_out:
+                return _both_unavailable(f"test run timed out after {self._timeout}s", "timeout")
+
+            junit = _read_report(out / "junit.xml")
+            coverage = _read_report(out / "coverage.xml")
+
+        if junit is None:
+            detail = result.stderr.strip()[:300] or f"runner exited {result.exit_code}"
+            return (
+                RawOutput(status="error", detail=f"no JUnit report produced: {detail}"),
+                _unavailable("no coverage report produced"),
+            )
+
+        return (
+            RawOutput(status="ok", text=junit, duration_ms=result.duration_ms),
+            RawOutput(status="ok", text=coverage, duration_ms=result.duration_ms)
+            if coverage is not None
+            else _unavailable("the run produced no coverage report"),
+        )
 
     def scan_secrets(self, repo: Path) -> RawOutput:
         if shutil.which("gitleaks") is None:

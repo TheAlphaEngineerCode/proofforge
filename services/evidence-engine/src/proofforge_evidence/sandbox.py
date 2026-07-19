@@ -49,6 +49,10 @@ class SandboxSpec:
     user: str = "10001:10001"
     mounts: list[Mount] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
+    #: Container paths backed by an anonymous volume, so they are writable under a
+    #: read-only root and vanish with the container. Used for the working copy,
+    #: which a dependency install fills with far more than a tmpfs should hold.
+    writable_volumes: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -95,6 +99,9 @@ def build_docker_command(spec: SandboxSpec, *, container_name: str) -> list[str]
     for mount in spec.mounts:
         suffix = ":ro" if mount.read_only else ""
         args += ["--volume", f"{mount.host.resolve().as_posix()}:{mount.container}{suffix}"]
+
+    for path in spec.writable_volumes:
+        args += ["--volume", path]
 
     for key, value in spec.env.items():
         args += ["--env", f"{key}={value}"]
