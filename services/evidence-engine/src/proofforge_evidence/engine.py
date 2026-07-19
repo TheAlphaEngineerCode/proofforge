@@ -103,11 +103,21 @@ class EvidenceEngine:
                 evidence.tests = test_ev
                 artifacts.append(self._persist("junit-report.xml", "junit", junit.text, out))
 
+        # Coverage gets its own provenance entry. Folding it into the tests run
+        # would leave a policy unable to tell "0% coverage" from "no coverage
+        # report", and it would fail a repository for a measurement we never took.
+        coverage_run = CollectorRun(
+            name="coverage",
+            status=coverage.status,
+            detail=coverage.detail,
+            duration_ms=coverage.duration_ms,
+        )
+
         if coverage.status == "ok" and coverage.text is not None:
             try:
                 total = parsers.parse_cobertura_line_rate(coverage.text)
             except parsers.ParseError as err:
-                run.detail = f"{run.detail}; coverage: {err}".strip("; ")
+                coverage_run.status, coverage_run.detail = "error", str(err)
             else:
                 evidence.tests.coverage_total = total
                 evidence.tests.coverage_changed = total  # approximate until diff-aware
@@ -115,6 +125,7 @@ class EvidenceEngine:
                 artifacts.append(self._persist("coverage.xml", "coverage", coverage.text, out))
 
         evidence.runs.append(run)
+        evidence.runs.append(coverage_run)
 
     def _collect_secrets(
         self, repo: Path, evidence: ConsolidatedEvidence, artifacts: list[Artifact], out: Path

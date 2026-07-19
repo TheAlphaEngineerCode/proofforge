@@ -81,7 +81,14 @@ def test_engine_builds_bundle_and_consolidates_evidence(
     assert ev.security.sast.high == 1
     assert ev.security.sbom_generated is True
     assert ev.security.sbom_components == 2
-    assert {r.name for r in ev.runs} == {"tests", "secrets", "sast", "vulnerabilities", "sbom"}
+    assert {r.name for r in ev.runs} == {
+        "tests",
+        "coverage",
+        "secrets",
+        "sast",
+        "vulnerabilities",
+        "sbom",
+    }
     assert all(r.status == "ok" for r in ev.runs)
 
 
@@ -139,6 +146,7 @@ def test_manifest_records_collector_provenance(tmp_path, read_fixture) -> None:
     collectors = result.manifest["collectors"]
     assert {c["name"] for c in collectors} == {
         "tests",
+        "coverage",
         "secrets",
         "sast",
         "vulnerabilities",

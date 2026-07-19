@@ -1,6 +1,6 @@
 import { ManifestSchema, computeEvidenceHash, type Manifest } from "@proofforge/evidence-spec";
 
-const ALL_COLLECTORS = ["tests", "secrets", "sast", "vulnerabilities", "sbom"];
+const ALL_COLLECTORS = ["tests", "coverage", "secrets", "sast", "vulnerabilities", "sbom"];
 
 /** A clean manifest where every collector ran; override per test. */
 export function buildManifest(overrides: Partial<Manifest> = {}): Manifest {

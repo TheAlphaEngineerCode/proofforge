@@ -121,6 +121,12 @@
       "durationMs": 12000
     },
     {
+      "name": "coverage",
+      "status": "ok",
+      "detail": "c8",
+      "durationMs": 900
+    },
+    {
       "name": "secrets",
       "status": "ok",
       "detail": "gitleaks",
@@ -158,7 +164,7 @@
     }
   ],
   "artifacts": [],
-  "evidenceHash": "sha256:4c011faa708bf36f90f0db853f495b14636de79126b2381272181160bb8e9fc2",
+  "evidenceHash": "sha256:314447da7e1a9457e087eedd2be03c31c7dcd1235131b7cdd0a26979129bc6a9",
   "signature": {
     "algorithm": "ed25519",
     "publicKeyId": "",

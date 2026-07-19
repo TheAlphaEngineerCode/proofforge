@@ -96,6 +96,7 @@ const input: ManifestInput = {
   // are unverifiable rather than satisfied.
   collectors: [
     { name: "tests", status: "ok", detail: "vitest", durationMs: 12000 },
+    { name: "coverage", status: "ok", detail: "c8", durationMs: 900 },
     { name: "secrets", status: "ok", detail: "gitleaks", durationMs: 850 },
     { name: "sast", status: "ok", detail: "semgrep", durationMs: 4300 },
     { name: "vulnerabilities", status: "ok", detail: "trivy", durationMs: 6100 },

@@ -39,8 +39,9 @@ const REQUIRES: Record<string, string> = {
   "security.secretsAllowed": "secrets",
   "security.sbomRequired": "sbom",
   "tests.maxFailedTests": "tests",
-  "tests.minChangedLinesCoverage": "tests",
   "tests.testsRequired": "tests",
+  // Coverage has its own collector: a missing report must not be judged as 0%.
+  "tests.minChangedLinesCoverage": "coverage",
 };
 
 export function evaluatePolicy(policy: Policy, manifest: Manifest): PolicyReport {

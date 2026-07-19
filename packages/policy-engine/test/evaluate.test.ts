@@ -150,3 +150,51 @@ exceptions:
     expect(report.failed.map((entry) => entry.rule)).toContain("security.secretsAllowed");
   });
 });
+
+describe("coverage provenance", () => {
+  const testsRanNoCoverage = () =>
+    buildManifest({
+      collectors: [
+        { name: "tests", status: "ok", detail: "", durationMs: 5 },
+        { name: "coverage", status: "unavailable", detail: "no reporter", durationMs: 0 },
+      ],
+      tests: {
+        passed: 40,
+        failed: 0,
+        skipped: 0,
+        durationMs: 100,
+        // No report, so this reads 0 — which must not be judged as 0% coverage.
+        coverage: { total: 0, changedLines: 0 },
+        reports: [],
+      },
+    });
+
+  it("does not fail a repository for coverage it never measured", () => {
+    const policy = loadPolicy(`
+version: "1.0"
+name: cov
+onUnverifiable: warn
+tests:
+  minChangedLinesCoverage: 80
+`);
+    const report = evaluatePolicy(policy, testsRanNoCoverage());
+
+    const failedRules = report.failed.map((entry) => entry.rule);
+    expect(failedRules).not.toContain("tests.minChangedLinesCoverage");
+
+    const warned = report.warnings.find((e) => e.rule === "tests.minChangedLinesCoverage");
+    expect(warned?.message).toContain("coverage collector did not run");
+  });
+
+  it("still enforces coverage that was actually measured", () => {
+    const policy = loadPolicy(`
+version: "1.0"
+name: cov
+tests:
+  minChangedLinesCoverage: 95
+`);
+    const report = evaluatePolicy(policy, buildManifest());
+
+    expect(report.failed.map((e) => e.rule)).toContain("tests.minChangedLinesCoverage");
+  });
+});
