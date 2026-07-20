@@ -70,15 +70,23 @@ class MigrationEvidence:
     detail: str = ""
 
 
+#: A migration under one of these is a fixture, not something that will run.
+#: Blocking a pull request over a test fixture is how a check like this ends up
+#: switched off, so the false positive costs more than the missed case.
+_NOT_REAL = ("/test/", "/tests/", "/__tests__/", "/fixtures/", "/testdata/", "/spec/")
+
+
 def is_migration_path(path: str) -> bool:
     normalised = path.replace("\\", "/")
     while normalised.startswith("./"):
         normalised = normalised[2:]
-    lowered = normalised.lower()
+    lowered = f"/{normalised.lower()}"
 
+    if any(marker in lowered for marker in _NOT_REAL):
+        return False
     if _FLYWAY.search(normalised):
         return True
-    return any(directory in f"{lowered}" for directory in _MIGRATION_DIRS)
+    return any(directory in lowered for directory in _MIGRATION_DIRS)
 
 
 def inspect(repo: Path, changed_paths: list[str]) -> MigrationEvidence:
@@ -92,10 +100,12 @@ def inspect(repo: Path, changed_paths: list[str]) -> MigrationEvidence:
 
     has_down = False
     destructive: list[str] = []
+    unread: list[str] = []
 
     for relative in migrations:
         text = _read(repo / relative)
         if text is None:
+            unread.append(relative)
             continue
         if any(marker.search(text) for marker in _DOWN_MARKERS):
             has_down = True
@@ -106,9 +116,18 @@ def inspect(repo: Path, changed_paths: list[str]) -> MigrationEvidence:
     # A down migration is a way back. Without one, an additive change is still
     # reversible — dropping what was added restores the previous shape — but a
     # destructive one is not, because the data it removed is not in the file.
-    reversible = has_down or not destructive
+    #
+    # A file we could not read is neither: it is a migration whose contents are
+    # unknown, and calling it reversible would assert exactly the safety this
+    # collector was written to stop being assumed.
+    reversible = has_down or (not destructive and not unread)
 
-    if has_down:
+    if unread:
+        detail = (
+            f"{len(migrations)} migration file(s), {len(unread)} unreadable "
+            f"({', '.join(unread[:3])}); reversibility could not be established"
+        )
+    elif has_down:
         detail = f"{len(migrations)} migration file(s), with a down migration"
     elif destructive:
         detail = (

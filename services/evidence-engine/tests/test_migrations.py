@@ -132,14 +132,47 @@ class TestJudgingReversibility:
         # The reviewer needs to know what, not just that.
         assert set(found.destructive_statements) == {"DROP TABLE", "TRUNCATE"}
 
-    def test_a_file_it_cannot_read_does_not_become_a_pass(self, tmp_path: Path) -> None:
-        """The path is in the diff but the file is gone from the worktree."""
+    def test_a_file_it_cannot_read_is_not_called_reversible(self, tmp_path: Path) -> None:
+        """The path is in the diff but the file is gone from the worktree.
+
+        The first version of this test checked `detected` and `rollback_available`
+        and never checked `reversible`, which was returning true: an empty list of
+        destructive statements reads the same whether the file was additive or
+        never opened.
+        """
         found = migrations.inspect(tmp_path, ["migrations/010_absent.sql"])
 
-        # Still detected — the change did touch a migration — and with nothing
-        # read there is no down migration to claim.
         assert found.detected is True
+        assert found.reversible is False
         assert found.rollback_available is False
+        assert "unreadable" in found.detail
+
+    def test_one_unreadable_file_taints_a_batch_that_looked_fine(self, tmp_path: Path) -> None:
+        write(tmp_path, "migrations/011_add.sql", "CREATE TABLE a (id int);")
+
+        found = migrations.inspect(
+            tmp_path, ["migrations/011_add.sql", "migrations/012_absent.sql"]
+        )
+
+        # The readable one is additive, which alone would be reversible. The
+        # unknown one is what stops the claim.
+        assert found.reversible is False
+
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "tests/fixtures/migrations/bad.sql",
+            "src/__tests__/migrations/001.sql",
+            "testdata/migrations/drop.sql",
+            "spec/db/migrate/001_x.rb",
+        ],
+    )
+    def test_a_fixture_is_not_a_migration(self, path: str) -> None:
+        """Blocking a pull request over a test fixture is how a check gets disabled."""
+        assert not migrations.is_migration_path(path)
+
+    def test_a_real_migration_beside_a_tests_directory_still_counts(self) -> None:
+        assert migrations.is_migration_path("packages/database/migrations/0000_init.sql")
 
 
 class TestInsideTheEngine:
