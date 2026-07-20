@@ -19,6 +19,7 @@ from proofforge_evidence.collectors import parsers
 from proofforge_evidence.context import Artifact, ChangeContext
 from proofforge_evidence.manifest_builder import build_manifest
 from proofforge_evidence.models import CollectorRun, ConsolidatedEvidence
+from proofforge_evidence.signing import Signer
 
 
 class RawOutput(BaseModel):
@@ -50,9 +51,16 @@ class EngineResult(BaseModel):
 
 
 class EvidenceEngine:
-    def __init__(self, toolchain: Toolchain, *, container_image: str = "") -> None:
+    def __init__(
+        self,
+        toolchain: Toolchain,
+        *,
+        container_image: str = "",
+        signer: Signer | None = None,
+    ) -> None:
         self._toolchain = toolchain
         self._image = container_image
+        self._signer = signer
 
     def run(self, repo: Path, context: ChangeContext, bundle_dir: Path) -> EngineResult:
         repo = repo.resolve()
@@ -75,7 +83,9 @@ class EvidenceEngine:
         self._collect_vulnerabilities(repo, evidence, artifacts, artifacts_dir)
         self._collect_sbom(repo, evidence, artifacts, artifacts_dir)
 
-        manifest = build_manifest(context, evidence, artifacts, container_image=self._image)
+        manifest = build_manifest(
+            context, evidence, artifacts, container_image=self._image, signer=self._signer
+        )
 
         (bundle_dir / "proof-manifest.json").write_text(
             json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"

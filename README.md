@@ -107,10 +107,28 @@ uv run proofforge-evidence build \
   --output-dir ./bundle
 ```
 
+### Sign the manifest
+
+Signing is optional and off by default. With a key, the bundle carries an ed25519
+signature over its evidence hash:
+
+```bash
+openssl genpkey -algorithm ed25519 -out private.pem
+openssl pkey -in private.pem -pubout -out public.pem
+chmod 600 private.pem
+
+uv run proofforge-evidence build ... --signing-key private.pem
+```
+
+The key is read from a file, not an environment variable: env vars show up in
+process listings, are inherited by child processes, and get dumped by crash
+handlers and CI debug output. If signing is requested and the key cannot be used,
+the run fails rather than handing back a manifest you would believe was signed.
+
 ### Verify and judge a manifest
 
 ```bash
-node packages/cli/dist/index.js evidence verify ./bundle/proof-manifest.json
+node packages/cli/dist/index.js evidence verify ./bundle/proof-manifest.json --public-key public.pem
 node packages/cli/dist/index.js policy evaluate policies/default.yml ./bundle/proof-manifest.json
 ```
 

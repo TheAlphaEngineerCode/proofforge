@@ -7,6 +7,7 @@ requires-python = ">=3.11"
 license = "Apache-2.0"
 dependencies = [
     "pydantic>=2.9",
+    "cryptography>=44.0",
 ]
 
 [project.scripts]

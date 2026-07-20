@@ -18,6 +18,7 @@ from pathlib import Path
 
 from proofforge_evidence.context import ChangeContext, RepositoryRef
 from proofforge_evidence.engine import EngineResult, EvidenceEngine
+from proofforge_evidence.signing import SigningError, load_signer
 from proofforge_evidence.toolchain import HostToolchain
 from proofforge_evidence.version import __version__
 
@@ -54,6 +55,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--output-dir", default=".proofforge/bundle", help="where to write the bundle"
     )
     build.add_argument("--image", default="", help="sandbox image digest recorded in the manifest")
+    build.add_argument(
+        "--signing-key",
+        default=None,
+        help="path to an ed25519 private key (PEM or raw base64) to sign the manifest",
+    )
     return parser
 
 
@@ -76,7 +82,17 @@ def _run_build(args: argparse.Namespace) -> int:
         mode=args.mode,
     )
 
-    engine = EvidenceEngine(HostToolchain(), container_image=args.image)
+    signer = None
+    if args.signing_key is not None:
+        try:
+            signer = load_signer(Path(args.signing_key))
+        except SigningError as err:
+            # Signing was asked for. Emitting an unsigned manifest instead
+            # would hand back a document the caller believes is signed.
+            print(f"error: {err}", file=sys.stderr)
+            return 2
+
+    engine = EvidenceEngine(HostToolchain(), container_image=args.image, signer=signer)
     bundle_dir = Path(args.output_dir)
     result = engine.run(repo, context, bundle_dir)
 

@@ -17,6 +17,7 @@ from proofforge_evidence.context import Artifact, ChangeContext
 from proofforge_evidence.manifest_hash import compute_evidence_hash
 from proofforge_evidence.models import ConsolidatedEvidence
 from proofforge_evidence.risk import compute_interim_risk
+from proofforge_evidence.signing import Signer
 from proofforge_evidence.version import SPEC_VERSION, __version__
 
 
@@ -26,8 +27,9 @@ def build_manifest(
     artifacts: list[Artifact],
     *,
     container_image: str = "",
+    signer: Signer | None = None,
 ) -> dict[str, Any]:
-    """Assemble the manifest dict and stamp its evidence hash."""
+    """Assemble the manifest dict, stamp its evidence hash and sign it if asked."""
 
     tests = evidence.tests
     sec = evidence.security
@@ -115,7 +117,14 @@ def build_manifest(
         "agents": [],
         "artifacts": refs,
         "evidenceHash": "",
-        "signature": {"algorithm": "ed25519", "publicKeyId": "", "value": ""},
+        "signature": {
+            "algorithm": "ed25519",
+            # Named before hashing on purpose: only `value` is excluded from
+            # the digest, so filling this in afterwards would invalidate the
+            # very hash just signed.
+            "publicKeyId": signer.public_key_id if signer else "",
+            "value": "",
+        },
         "createdAt": datetime.now(UTC).isoformat(),
     }
 
@@ -125,4 +134,10 @@ def build_manifest(
         del manifest["change"]["pullRequest"]
 
     manifest["evidenceHash"] = compute_evidence_hash(manifest)
+
+    # Only the value is written after hashing, and only the value is excluded
+    # from the digest — so the document still hashes to what was signed.
+    if signer is not None:
+        manifest["signature"]["value"] = signer.sign(manifest["evidenceHash"])
+
     return manifest
