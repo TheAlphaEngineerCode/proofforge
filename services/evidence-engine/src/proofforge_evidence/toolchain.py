@@ -116,6 +116,47 @@ class HostToolchain:
             else _unavailable("the run produced no coverage report"),
         )
 
+    def run_benchmarks(self, repo: Path) -> RawOutput:
+        """Run the repository's benchmarks in the sandbox and return the report.
+
+        Same containment as the test run: benchmark code is repository code, so
+        it executes in a container or not at all.
+        """
+
+        if not docker_available():
+            return _unavailable("Docker unavailable; benchmark code never runs on the host")
+
+        try:
+            plan = runners.benchmark_plan_for(repo)
+        except runners.UnsupportedStackError as err:
+            return _unavailable(str(err))
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            out = Path(out_dir)
+            spec = SandboxSpec(
+                image=plan.image,
+                command=[plan.script],
+                workdir=runners.WORK_DIR,
+                timeout_s=self._timeout,
+                network=True,
+                mounts=[
+                    Mount(host=repo, container=runners.SOURCE_MOUNT, read_only=True),
+                    Mount(host=out, container=runners.OUTPUT_DIR, read_only=False),
+                ],
+                writable_volumes=[runners.WORK_DIR],
+            )
+
+            result = self._sandbox.run(spec)
+            if result.timed_out:
+                return _unavailable(f"benchmarks timed out after {self._timeout}s", "timeout")
+
+            report = _read_report(out / "benchmarks.json")
+
+        if report is None:
+            detail = result.stderr.strip()[:300] or f"runner exited {result.exit_code}"
+            return RawOutput(status="error", detail=f"no benchmark report produced: {detail}")
+        return RawOutput(status="ok", text=report, duration_ms=result.duration_ms)
+
     def scan_secrets(self, repo: Path) -> RawOutput:
         if shutil.which("gitleaks") is None:
             return RawOutput(status="unavailable", detail="gitleaks not installed")

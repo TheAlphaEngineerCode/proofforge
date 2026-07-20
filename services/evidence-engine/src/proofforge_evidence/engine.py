@@ -14,11 +14,16 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
-from proofforge_evidence import changed_coverage, diff
-from proofforge_evidence.collectors import migrations, parsers, quality
+from proofforge_evidence import changed_coverage, diff, worktree
+from proofforge_evidence.collectors import benchmarks, migrations, parsers, quality
 from proofforge_evidence.context import Artifact, ChangeContext
 from proofforge_evidence.manifest_builder import build_manifest
-from proofforge_evidence.models import CollectorRun, ConsolidatedEvidence, OperationsEvidence
+from proofforge_evidence.models import (
+    CollectorRun,
+    ConsolidatedEvidence,
+    OperationsEvidence,
+    PerformanceEntry,
+)
 from proofforge_evidence.signing import Signer
 
 
@@ -37,6 +42,9 @@ class Toolchain(Protocol):
 
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
         """Return (JUnit XML, Cobertura XML) outputs."""
+
+    def run_benchmarks(self, repo: Path) -> RawOutput:
+        """Return a pytest-benchmark JSON report. Runs repository code, so sandboxed."""
 
     def scan_secrets(self, repo: Path) -> RawOutput: ...
     def scan_sast(self, repo: Path) -> RawOutput: ...
@@ -81,6 +89,7 @@ class EvidenceEngine:
         self._record_uncollected(evidence)
         self._collect_operations(repo, context, evidence)
         self._collect_quality(repo, context, evidence)
+        self._collect_performance(repo, context, evidence)
         self._collect_secrets(repo, evidence, artifacts, artifacts_dir)
         self._collect_sast(repo, evidence, artifacts, artifacts_dir)
         self._collect_vulnerabilities(repo, evidence, artifacts, artifacts_dir)
@@ -194,11 +203,77 @@ class EvidenceEngine:
         migrations could never fire.
         """
 
+
+
+    def _collect_performance(
+        self, repo: Path, context: ChangeContext, evidence: ConsolidatedEvidence
+    ) -> None:
+        """Benchmark the change against the commit it branched from.
+
+        A regression is a comparison, so one run measures nothing: the suite runs
+        on this checkout and again on a throwaway checkout of the base. If either
+        side cannot be produced the collector says so, because a percentage from
+        one measurement would be invented.
+        """
+
+        candidate_raw = self._toolchain.run_benchmarks(repo)
+        if candidate_raw.status != "ok" or candidate_raw.text is None:
+            evidence.runs.append(
+                CollectorRun(
+                    name="performance",
+                    status=candidate_raw.status,
+                    detail=candidate_raw.detail or "no benchmarks ran on the change",
+                    duration_ms=candidate_raw.duration_ms,
+                )
+            )
+            return
+
+        with worktree.checkout(repo, context.base_commit) as base_tree:
+            if base_tree is None:
+                evidence.runs.append(
+                    CollectorRun(
+                        name="performance",
+                        status="unavailable",
+                        detail="the base commit could not be checked out, so there is no baseline",
+                    )
+                )
+                return
+            baseline_raw = self._toolchain.run_benchmarks(base_tree)
+
+        if baseline_raw.status != "ok" or baseline_raw.text is None:
+            evidence.runs.append(
+                CollectorRun(
+                    name="performance",
+                    status="unavailable",
+                    detail=f"the base commit produced no benchmarks: {baseline_raw.detail}",
+                )
+            )
+            return
+
+        try:
+            baseline = benchmarks.parse_pytest_benchmark(baseline_raw.text)
+            candidate = benchmarks.parse_pytest_benchmark(candidate_raw.text)
+        except benchmarks.BenchmarkParseError as err:
+            evidence.runs.append(
+                CollectorRun(name="performance", status="error", detail=str(err))
+            )
+            return
+
+        compared = benchmarks.compare(baseline, candidate)
+        evidence.performance = [
+            PerformanceEntry(
+                name=item.name,
+                baseline_ms=item.baseline_ms,
+                candidate_ms=item.candidate_ms,
+                regression_percentage=item.regression_percentage,
+            )
+            for item in compared.benchmarks
+        ]
         evidence.runs.append(
             CollectorRun(
                 name="performance",
-                status="unavailable",
-                detail="no benchmark collector exists yet",
+                status="ok" if compared.measured else "unavailable",
+                detail=compared.detail,
             )
         )
 

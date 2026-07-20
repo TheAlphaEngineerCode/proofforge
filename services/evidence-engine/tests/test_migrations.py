@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from proofforge_evidence.collectors import migrations
+from proofforge_evidence.engine import RawOutput
 
 
 def write(repo: Path, relative: str, text: str) -> None:
@@ -215,6 +216,10 @@ class _NullToolchain:
 
     def run_tests(self, repo: Path):  # noqa: ANN201, ARG002
         raise AssertionError("not used")
+
+    def run_benchmarks(self, repo: Path) -> RawOutput:  # noqa: ARG002
+        """No benchmark suite in these fixtures."""
+        return RawOutput(status="unavailable", detail="no benchmarks")
 
     def scan_secrets(self, repo: Path):  # noqa: ANN201, ARG002
         raise AssertionError("not used")

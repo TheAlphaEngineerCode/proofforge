@@ -195,9 +195,10 @@ counting braces in TypeScript would produce a number that looks like a measureme
 cannot parse are named in the collector's detail rather than averaged away. Duplication is
 line-based and applies to any source file — a real signal and a crude one.
 
-Performance evidence is still not collected. The field exists in the spec and nothing fills
-it, so it carries a collector entry marked `unavailable` — consumers must not read its
-default as a measurement, and the policy refuses to judge a rule whose collector never ran.
+Performance is a comparison, so it is measured on both sides: the benchmark suite runs in
+the sandbox on the change and again on a throwaway checkout of the base commit. Only
+pytest-benchmark is read, and a benchmark present on one side only is left out rather than
+compared against nothing — the manifest has no way to say "new, no baseline".
 
 ## Roadmap
 

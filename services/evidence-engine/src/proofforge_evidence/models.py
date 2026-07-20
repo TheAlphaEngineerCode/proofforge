@@ -54,6 +54,15 @@ class CollectorRun(BaseModel):
     duration_ms: int = 0
 
 
+class PerformanceEntry(BaseModel):
+    """One benchmark, measured on both sides of the change."""
+
+    name: str
+    baseline_ms: float
+    candidate_ms: float
+    regression_percentage: float
+
+
 class QualityEvidence(BaseModel):
     """Complexity and duplication. Their collectors report separately, because
     one is exact for Python only and the other applies to any text."""
@@ -79,6 +88,7 @@ class OperationsEvidence(BaseModel):
 class ConsolidatedEvidence(BaseModel):
     tests: TestEvidence = Field(default_factory=TestEvidence)
     security: SecurityEvidence = Field(default_factory=SecurityEvidence)
+    performance: list[PerformanceEntry] = Field(default_factory=list)
     quality: QualityEvidence = Field(default_factory=QualityEvidence)
     operations: OperationsEvidence = Field(default_factory=OperationsEvidence)
     runs: list[CollectorRun] = Field(default_factory=list)

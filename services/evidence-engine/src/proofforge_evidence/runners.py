@@ -21,6 +21,7 @@ from pathlib import Path
 OUTPUT_DIR = "/out"
 JUNIT_PATH = f"{OUTPUT_DIR}/junit.xml"
 COVERAGE_PATH = f"{OUTPUT_DIR}/coverage.xml"
+BENCHMARK_PATH = f"{OUTPUT_DIR}/benchmarks.json"
 
 #: The repository is mounted read-only and copied here, because installing
 #: dependencies and running tests both write all over the working tree.
@@ -108,6 +109,45 @@ def plan_for(stack: str) -> RunnerPlan:
         )
 
     raise UnsupportedStackError(f"no runner for stack: {stack}")
+
+
+def benchmark_plan_for(repo: Path) -> RunnerPlan:
+    """How to run this repository's benchmarks, or raise.
+
+    Only pytest-benchmark: its JSON is documented, and a tool whose output we
+    guessed at would yield regression percentages that look measured.
+    """
+
+    if not _has_pytest_benchmark(repo):
+        raise UnsupportedStackError(
+            "no pytest-benchmark suite found; it is the only benchmark format read"
+        )
+
+    return RunnerPlan(
+        stack="pytest-benchmark",
+        image="ghcr.io/proofforge/sandbox-python:3.12",
+        script=_script(
+            install="python -m venv --system-site-packages .venv; "
+            ". .venv/bin/activate; "
+            "if [ -f uv.lock ]; then uv sync --frozen --active; "
+            "elif [ -f requirements.txt ]; then "
+            "pip install --no-cache-dir -r requirements.txt; "
+            "else pip install --no-cache-dir -e .; fi; "
+            "pip install --no-cache-dir pytest-benchmark",
+            # `--benchmark-only` skips the ordinary tests: they already ran, and
+            # running them again here would double the cost for no evidence.
+            test=f".venv/bin/python -m pytest --benchmark-only "
+            f"--benchmark-json={BENCHMARK_PATH} || true",
+        ),
+    )
+
+
+def _has_pytest_benchmark(repo: Path) -> bool:
+    for name in ("pyproject.toml", "requirements.txt", "tox.ini"):
+        path = repo / name
+        if path.exists() and "pytest-benchmark" in _read(path):
+            return True
+    return False
 
 
 def _script(install: str, test: str) -> str:

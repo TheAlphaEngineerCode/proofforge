@@ -26,6 +26,10 @@ class FakeToolchain:
             RawOutput(status="ok", text=self._read("cobertura.xml")),
         )
 
+    def run_benchmarks(self, repo: Path) -> RawOutput:  # noqa: ARG002
+        """No benchmark suite in these fixtures."""
+        return RawOutput(status="unavailable", detail="no benchmarks")
+
     def scan_secrets(self, repo: Path) -> RawOutput:
         return RawOutput(status="ok", text=self._read("gitleaks.json"))
 
@@ -42,6 +46,9 @@ class FakeToolchain:
 class EmptyToolchain:
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
         return RawOutput(status="unavailable"), RawOutput(status="unavailable")
+
+    def run_benchmarks(self, repo: Path) -> RawOutput:
+        return RawOutput(status="unavailable")
 
     def scan_secrets(self, repo: Path) -> RawOutput:
         return RawOutput(status="unavailable")

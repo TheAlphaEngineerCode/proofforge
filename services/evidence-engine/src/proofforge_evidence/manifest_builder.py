@@ -95,7 +95,17 @@ def build_manifest(
             "removedDependencies": [],
             "architectureViolations": [],
         },
-        "performance": {"benchmarks": []},
+        "performance": {
+            "benchmarks": [
+                {
+                    "name": entry.name,
+                    "baselineMs": entry.baseline_ms,
+                    "candidateMs": entry.candidate_ms,
+                    "regressionPercentage": entry.regression_percentage,
+                }
+                for entry in evidence.performance
+            ]
+        },
         "operations": {
             "migrationsDetected": ops.migrations_detected,
             "migrationsReversible": ops.migrations_reversible,
