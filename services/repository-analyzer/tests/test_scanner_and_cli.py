@@ -36,6 +36,22 @@ def test_scanner_does_not_descend_into_fixture_trees(tmp_path: Path) -> None:
     assert not any("fixtures/" in r for r in relpaths)
 
 
+def test_scanner_keeps_a_fixtures_dir_that_is_just_source(tmp_path: Path) -> None:
+    """The name is not the signal; a project manifest is.
+
+    Skipping every directory called fixtures would trade a false positive for a
+    silent blind spot, and an unscanned module reports as no module at all.
+    """
+    (tmp_path / "src" / "fixtures").mkdir(parents=True)
+    (tmp_path / "src" / "fixtures" / "users.ts").write_text(
+        "export const alice = {};\n", encoding="utf-8"
+    )
+
+    relpaths = {f.relpath for f in scan_repository(tmp_path)}
+
+    assert "src/fixtures/users.ts" in relpaths
+
+
 def test_scanner_still_scans_a_fixture_pointed_at_directly(tmp_path: Path) -> None:
     """Blocking descent must not make a fixture unanalyzable on purpose.
 

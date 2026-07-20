@@ -36,18 +36,24 @@ IGNORED_DIRS = frozenset(
         ".gradle",
         ".idea",
         ".vscode",
-        # Fixture trees are whole miniature projects with their own manifests.
-        # Descending into them made this analyzer report Express, Jest and Redis
-        # for ProofForge itself, none of which it uses — a false positive in a
-        # report that is meant to be evidence. The evidence engine's collectors
-        # already draw the same line.
-        #
-        # Only descent is blocked, so pointing the analyzer straight at a fixture
-        # still works; that is how this project's own tests exercise it.
-        "fixtures",
-        "__fixtures__",
-        "testdata",
-        "test-data",
+    }
+)
+
+# Names that usually hold fixture projects, but sometimes hold ordinary source.
+# The name alone does not settle it -- see _holds_nested_project.
+FIXTURE_DIR_NAMES = frozenset({"fixtures", "__fixtures__", "testdata", "test-data"})
+
+# A directory carrying one of these declares a project of its own.
+PROJECT_MANIFESTS = frozenset(
+    {
+        "package.json",
+        "pyproject.toml",
+        "go.mod",
+        "Cargo.toml",
+        "pom.xml",
+        "build.gradle",
+        "composer.json",
+        "Gemfile",
     }
 )
 
@@ -104,6 +110,33 @@ def _count_lines(path: Path) -> int:
         return 0
 
 
+def _holds_nested_project(path: Path) -> bool:
+    """True when a fixture-named directory contains a project of its own.
+
+    A fixture tree is a miniature repository, and its stack is not the host's:
+    walking into ours made the analyzer report Express, Jest and Docker for
+    ProofForge, which uses none of them. That is a false positive in a report
+    meant to be evidence.
+
+    A directory merely *called* fixtures may hold perfectly ordinary source, and
+    skipping that would trade a false positive for a silent blind spot. A
+    manifest is what separates the two, either here or one level down, which is
+    the usual fixtures/<project>/package.json shape.
+    """
+
+    def declares_project(candidate: Path) -> bool:
+        return any((candidate / manifest).exists() for manifest in PROJECT_MANIFESTS)
+
+    try:
+        if declares_project(path):
+            return True
+        return any(child.is_dir() and declares_project(child) for child in path.iterdir())
+    except OSError:
+        # Unreadable means we cannot claim it is a fixture; scanning it and
+        # finding nothing is the safer error.
+        return False
+
+
 def scan_repository(root: Path) -> list[ScannedFile]:
     """Return every non-ignored file under ``root`` as a list of ScannedFile."""
 
@@ -111,8 +144,16 @@ def scan_repository(root: Path) -> list[ScannedFile]:
     files: list[ScannedFile] = []
 
     for dirpath, dirnames, filenames in os.walk(root):
-        # Prune ignored directories in place so os.walk does not descend into them.
-        dirnames[:] = [d for d in dirnames if d not in IGNORED_DIRS]
+        # Prune ignored directories in place so os.walk does not descend into
+        # them. Only descent is pruned, never the scan root, so pointing the
+        # analyzer straight at a fixture still works -- which is how this
+        # project's own tests drive it.
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in IGNORED_DIRS
+            and not (d in FIXTURE_DIR_NAMES and _holds_nested_project(Path(dirpath) / d))
+        ]
 
         for filename in filenames:
             absolute = Path(dirpath) / filename
