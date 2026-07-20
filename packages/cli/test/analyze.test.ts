@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { analyze, type AnalyzerResult } from "../src/commands/analyze.js";
+import { analyze, runAnalyzer, type AnalyzerResult } from "../src/commands/analyze.js";
 import { ExitCode } from "../src/exit-codes.js";
 
 const dir = mkdtempSync(join(tmpdir(), "pf-analyze-"));
@@ -113,5 +113,42 @@ describe("when the analysis cannot happen", () => {
 
     expect(JSON.parse(unavailable.stdout)).toMatchObject({ analyzed: false, reason: "no uv" });
     expect(unavailable.exitCode).not.toBe(failed.exitCode);
+  });
+});
+
+
+describe("finding the analyzer service", () => {
+  it("does not depend on the working directory", () => {
+    // The first version passed a path relative to the cwd, so the command only
+    // worked from the repository root. Everywhere else it reported that the
+    // analyzer had failed, when it had never been found.
+    const elsewhere = mkdtempSync(join(tmpdir(), "pf-cwd-"));
+    const original = process.cwd();
+
+    process.chdir(elsewhere);
+    try {
+      const result = runAnalyzer(dir, false);
+      // Either it ran, or uv is absent. What it must not be is the "failed"
+      // status, which would mean we mistook a missing analyzer for a broken one.
+      expect(result.status).not.toBe("failed");
+    } finally {
+      process.chdir(original);
+    }
+  });
+
+  it("reports a configured directory that holds no analyzer", () => {
+    const empty = mkdtempSync(join(tmpdir(), "pf-noanalyzer-"));
+    const previous = process.env.PROOFFORGE_ANALYZER_DIR;
+
+    process.env.PROOFFORGE_ANALYZER_DIR = empty;
+    try {
+      const result = runAnalyzer(dir, false);
+
+      expect(result.status).toBe("unavailable");
+      expect(result.detail).toContain("not found");
+    } finally {
+      if (previous === undefined) delete process.env.PROOFFORGE_ANALYZER_DIR;
+      else process.env.PROOFFORGE_ANALYZER_DIR = previous;
+    }
   });
 });

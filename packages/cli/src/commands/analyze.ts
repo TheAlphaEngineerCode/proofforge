@@ -12,7 +12,8 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { ExitCode } from "../exit-codes.js";
 import { fail, jsonBlock, safe, type CommandResult } from "../output.js";
@@ -82,7 +83,17 @@ function runAnalyzer(repoPath: string, json: boolean): AnalyzerResult {
     return { status: "unavailable", stdout: "", detail: "the repository path is not usable" };
   }
 
-  const args = ["run", "--directory", "services/repository-analyzer", "proofforge-analyzer"];
+  const analyzerDir = findAnalyzer();
+  if (analyzerDir === null) {
+    return {
+      status: "unavailable",
+      stdout: "",
+      detail:
+        "the analyzer service was not found; set PROOFFORGE_ANALYZER_DIR to its directory",
+    };
+  }
+
+  const args = ["run", "--directory", analyzerDir, "proofforge-analyzer"];
   if (json) args.push("--json");
   // The path goes after `--` so a name that begins with a dash cannot be read
   // as an option by the analyzer's own parser.
@@ -113,6 +124,30 @@ function runAnalyzer(repoPath: string, json: boolean): AnalyzerResult {
   }
 
   return { status: "ok", stdout: result.stdout ?? "", detail: "" };
+}
+
+/**
+ * Locate the Python service.
+ *
+ * The first version passed a path relative to the working directory, so the
+ * command only worked when run from the repository root — and everywhere else
+ * it reported that the analyzer had failed, when in fact it had never been
+ * found. Resolving from this module's own location makes the working directory
+ * irrelevant; the environment variable covers a layout this cannot guess.
+ */
+function findAnalyzer(): string | null {
+  const configured = process.env.PROOFFORGE_ANALYZER_DIR;
+  if (configured !== undefined && configured.trim() !== "") {
+    return existsSync(join(configured, "pyproject.toml")) ? configured : null;
+  }
+
+  // packages/cli/dist/index.js → the repository root is three levels up.
+  const here = dirname(fileURLToPath(import.meta.url));
+  for (const up of ["../../..", "../.."]) {
+    const candidate = resolve(here, up, "services/repository-analyzer");
+    if (existsSync(join(candidate, "pyproject.toml"))) return candidate;
+  }
+  return null;
 }
 
 export { runAnalyzer };

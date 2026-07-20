@@ -174,8 +174,9 @@ a command whose failure would be misread.
 | `proofforge init` | Scaffold a policy file | 🔜 not wired |
 | `proofforge run --task "..."` | Run an agent task | 🔜 not wired to the CLI |
 
-`analyze` runs the Python analyzer service, so it needs **uv** on the path; without it the
-command says the analyzer is missing rather than reporting a repository with nothing in it.
+`analyze` runs the Python analyzer service, so it needs **uv** on the path. The service is
+located relative to the CLI, or through `PROOFFORGE_ANALYZER_DIR`; when it cannot be found
+the command says so rather than reporting a repository with nothing in it.
 See [docs/cli.md](./docs/cli.md) for usage and exit codes.
 
 ## The proof-manifest
