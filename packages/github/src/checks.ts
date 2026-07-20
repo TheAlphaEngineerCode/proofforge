@@ -5,6 +5,7 @@
  * model's opinion — so the same evidence always yields the same conclusion.
  */
 import type { Manifest } from "@proofforge/evidence-spec";
+import { measured } from "./provenance.js";
 
 export type CheckConclusion = "success" | "failure" | "neutral";
 
@@ -36,8 +37,10 @@ export function evaluateManifest(manifest: Manifest): Verdict {
   if (manifest.security.criticalVulnerabilities > 0) {
     blocking.push(`${manifest.security.criticalVulnerabilities} critical vulnerability(ies)`);
   }
-  if (manifest.policies.failed.length > 0) {
-    blocking.push(`${manifest.policies.failed.length} policy violation(s)`);
+  // Name the rules. A count tells a reviewer that something is wrong without
+  // telling them what to fix, and the rule name is the only part they can act on.
+  for (const violation of manifest.policies.failed) {
+    blocking.push(`policy ${violation.rule}`);
   }
   if (manifest.operations.migrationsDetected && !manifest.operations.migrationsReversible) {
     blocking.push("irreversible migration");
@@ -54,23 +57,45 @@ export function evaluateManifest(manifest: Manifest): Verdict {
 
 export function mapManifestToCheckRun(manifest: Manifest): CheckRunResult {
   const verdict = evaluateManifest(manifest);
-  const { tests, security, risk } = manifest;
+  const { tests, security, risk, policies } = manifest;
 
-  const summary = [
+  // Every number here is paired with whether anyone produced it. A zero from a
+  // scan that never ran is not a clean result, and printing it as one is the
+  // failure this whole product argues against.
+  const lines = [
     `**Risk ${risk.score}/100 — ${risk.level}**`,
     "",
-    `- Tests: ${tests.passed} passed, ${tests.failed} failed, ${tests.skipped} skipped`,
-    `- Coverage on changed lines: ${tests.coverage.changedLines}%`,
-    `- Vulnerabilities: ${security.criticalVulnerabilities} critical, ${security.highVulnerabilities} high`,
-    `- Secrets detected: ${security.secretsDetected}`,
+    `- Tests: ${measured(manifest, "tests", () => `${tests.passed} passed, ${tests.failed} failed, ${tests.skipped} skipped`).text}`,
+    `- Coverage on changed lines: ${measured(manifest, "coverage", () => `${tests.coverage.changedLines}%`).text}`,
+    `- Vulnerabilities: ${measured(manifest, "vulnerabilities", () => `${security.criticalVulnerabilities} critical, ${security.highVulnerabilities} high`).text}`,
+    `- Secrets: ${measured(manifest, "secrets", () => `${security.secretsDetected} detected`).text}`,
     `- SBOM: ${security.sbomGenerated ? "generated" : "not generated"}`,
+  ];
+
+  if (policies.failed.length > 0) {
+    lines.push("", "**Policy violations**");
+    for (const violation of policies.failed) {
+      lines.push(`- \`${violation.rule}\` — ${violation.message}`);
+    }
+  }
+
+  // Warnings are usually rules that could not be evaluated at all. Leaving them
+  // out would let a rule nobody checked pass for a rule that was satisfied.
+  if (policies.warnings.length > 0) {
+    lines.push("", "**Policy warnings**");
+    for (const warning of policies.warnings) {
+      lines.push(`- \`${warning.rule}\` — ${warning.message}`);
+    }
+  }
+
+  lines.push(
     "",
     verdict.blocking.length > 0
       ? `**Blocking:** ${verdict.blocking.join("; ")}.`
       : "No blocking findings.",
     "",
     `Evidence hash: \`${manifest.evidenceHash}\``,
-  ].join("\n");
+  );
 
-  return { conclusion: verdict.conclusion, title: verdict.headline, summary };
+  return { conclusion: verdict.conclusion, title: verdict.headline, summary: lines.join("\n") };
 }

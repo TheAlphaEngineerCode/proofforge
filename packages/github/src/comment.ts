@@ -83,11 +83,30 @@ export function renderPullRequestComment(manifest: Manifest): string {
     lines.push(warn(`${quality.architectureViolations.length} architecture violation(s)`));
   }
 
+  // The policy is what actually decides the verdict, so hiding it leaves the
+  // reviewer with a conclusion and no way to see how it was reached — or which
+  // rule to fix.
+  const policyLines: string[] = [];
+  for (const violation of manifest.policies.failed) {
+    policyLines.push(fail(`\`${violation.rule}\` — ${violation.message}`));
+  }
+  for (const warning of manifest.policies.warnings) {
+    policyLines.push(warn(`\`${warning.rule}\` — ${warning.message}`));
+  }
+
+  const policySection =
+    policyLines.length > 0
+      ? ["", "### Policy", "", ...policyLines]
+      : manifest.policies.passed.length > 0
+        ? ["", `<sub>${manifest.policies.passed.length} policy rules passed.</sub>`]
+        : [];
+
   return [
     COMMENT_MARKER,
     "## ProofForge Verification",
     "",
     ...lines,
+    ...policySection,
     "",
     `**Overall risk: ${risk.score}/100 — ${risk.level}**`,
     "",
