@@ -8,7 +8,7 @@
  * loosened the first time it says no.
  */
 
-import { existsSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { loadPolicy } from "@proofforge/policy-engine";
@@ -84,34 +84,37 @@ risk:
 export function init(options: InitOptions = {}): CommandResult {
   const target = resolve(options.cwd ?? process.cwd(), POLICY_FILENAME);
 
-  if (existsSync(target) && options.force !== true) {
-    // The existing file may be the policy actually governing this repository.
-    return {
-      exitCode: ExitCode.UsageError,
-      stdout: [
-        fail(`${POLICY_FILENAME} already exists`),
-        warn("Pass --force to overwrite it."),
-      ].join("\n"),
-    };
-  }
-
-  try {
-    writeFileSync(target, TEMPLATE, { encoding: "utf8" });
-  } catch (err) {
-    return {
-      exitCode: ExitCode.UsageError,
-      stdout: fail(`Could not write ${POLICY_FILENAME}: ${safe(String(err))}`),
-    };
-  }
-
-  // Writing a file the policy engine rejects would hand someone a starting point
-  // that fails on first use, so the template is parsed before we claim success.
+  // Parsed before anything is written. Checking afterwards would leave a broken
+  // policy on disk and then complain about it, which is a worse outcome than
+  // refusing — the file is what someone reaches for next.
   try {
     loadPolicy(TEMPLATE);
   } catch (err) {
     return {
       exitCode: ExitCode.VerificationFailed,
-      stdout: fail(`Wrote ${POLICY_FILENAME}, but it does not parse: ${safe(String(err))}`),
+      stdout: fail(`The built-in policy template does not parse: ${safe(String(err))}`),
+    };
+  }
+
+  try {
+    // "wx" fails if the file exists, so the check and the write are one step.
+    // Testing first and writing second leaves a window in which a policy someone
+    // just added gets overwritten by a command that promised not to.
+    writeFileSync(target, TEMPLATE, { encoding: "utf8", flag: options.force === true ? "w" : "wx" });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "EEXIST") {
+      // The file on disk may be the policy actually governing this repository.
+      return {
+        exitCode: ExitCode.UsageError,
+        stdout: [
+          fail(`${POLICY_FILENAME} already exists`),
+          warn("Pass --force to overwrite it."),
+        ].join("\n"),
+      };
+    }
+    return {
+      exitCode: ExitCode.UsageError,
+      stdout: fail(`Could not write ${POLICY_FILENAME}: ${safe(String(err))}`),
     };
   }
 

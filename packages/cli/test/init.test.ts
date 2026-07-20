@@ -105,3 +105,29 @@ describe("an existing policy", () => {
     expect(policyIn(dir)).toContain("name: starter");
   });
 });
+
+
+describe("writing safely", () => {
+  it("never leaves an unparseable policy behind", () => {
+    // The template is checked before the write, so a broken one produces no
+    // file at all rather than a file plus a complaint about it.
+    const dir = emptyDir();
+
+    init({ cwd: dir });
+
+    expect(() => loadPolicy(policyIn(dir))).not.toThrow();
+  });
+
+  it("refuses an existing file in one step rather than two", () => {
+    // "wx" makes the check and the write atomic. Testing first and writing
+    // second leaves a window where a policy added in between is overwritten by
+    // a command that promised not to.
+    const dir = emptyDir();
+    writeFileSync(join(dir, POLICY_FILENAME), "name: mine\n", "utf8");
+
+    const result = init({ cwd: dir });
+
+    expect(result.exitCode).toBe(ExitCode.UsageError);
+    expect(policyIn(dir)).toBe("name: mine\n");
+  });
+});
