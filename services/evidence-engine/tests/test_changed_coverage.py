@@ -128,3 +128,36 @@ def _measure(tmp_path: Path, coverage_xml: str) -> changed_coverage.ChangedCover
         return changed_coverage.compute(tmp_path, "base", "head", coverage_xml)
     finally:
         module.diff.changed_lines = original  # type: ignore[assignment]
+
+
+class TestHostileInput:
+    def test_a_commit_that_looks_like_a_git_option_is_refused(self, tmp_path: Path) -> None:
+        """`base..head` with a leading dash reads as an option, not a range."""
+        with pytest.raises(diff.DiffUnavailableError, match="not a commit id"):
+            diff.changed_lines(tmp_path, "--output=/tmp/pwned", "abc1234")
+
+    def test_a_branch_name_is_refused_too(self, tmp_path: Path) -> None:
+        with pytest.raises(diff.DiffUnavailableError, match="not a commit id"):
+            diff.changed_lines(tmp_path, "main", "abc1234")
+
+    def test_added_content_beginning_with_plus_is_not_read_as_a_header(self) -> None:
+        """Someone adds a line of text that itself starts with `++`."""
+        text = """\
+diff --git a/notes.md b/notes.md
+--- a/notes.md
++++ b/notes.md
+@@ -0,0 +1,2 @@
++++ this is content, not a header
++second line
+"""
+
+        assert diff.parse_unified_diff(text) == {"notes.md": {1, 2}}
+
+    def test_a_dot_directory_keeps_its_dot(self, tmp_path: Path, monkeypatch) -> None:
+        """lstrip('./') would turn .config/app.py into config/app.py."""
+        monkeypatch.setattr(diff, "changed_lines", lambda *_: {".config/app.py": {3}})
+        report = cobertura({3: 1}, filename=".config/app.py")
+
+        result = changed_coverage.compute(tmp_path, "abc1234", "def5678", report)
+
+        assert result.percentage == 100.0

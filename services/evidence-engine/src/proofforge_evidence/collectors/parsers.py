@@ -115,9 +115,16 @@ def parse_cobertura_line_hits(xml_text: str) -> dict[str, dict[int, int]]:
 
 
 def _normalise_path(path: str) -> str:
-    """Compare paths the way both sides write them: forward slashes, no ./ prefix."""
+    """Compare paths the way both sides write them: forward slashes, no ./ prefix.
 
-    cleaned = path.replace("\\", "/").lstrip("./")
+    `lstrip("./")` would look right and be wrong — it strips any run of dots and
+    slashes, so `.config/settings.py` becomes `config/settings.py` and its
+    coverage gets attributed to a file that may not exist.
+    """
+
+    cleaned = path.replace("\\", "/")
+    while cleaned.startswith("./"):
+        cleaned = cleaned[2:]
     return cleaned
 
 

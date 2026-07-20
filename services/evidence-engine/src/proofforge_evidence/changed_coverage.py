@@ -93,7 +93,9 @@ def _lookup(hits: dict[str, dict[int, int]], path: str) -> dict[int, int] | None
     ambiguous one would attribute coverage to the wrong file.
     """
 
-    normalised = path.replace("\\", "/").lstrip("./")
+    normalised = path.replace("\\", "/")
+    while normalised.startswith("./"):
+        normalised = normalised[2:]
     exact = hits.get(normalised)
     if exact is not None:
         return exact
