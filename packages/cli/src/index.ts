@@ -3,6 +3,7 @@ import { SPEC_VERSION } from "@proofforge/evidence-spec";
 import { manifestInspect, manifestValidate } from "./commands/manifest.js";
 import { evidenceVerify } from "./commands/evidence.js";
 import { policyEvaluate, policyValidate } from "./commands/policy.js";
+import { analyze } from "./commands/analyze.js";
 import { runCommand } from "./run.js";
 import { PLANNED, unavailableNotice } from "./planned.js";
 
@@ -67,6 +68,15 @@ for (const command of PLANNED) {
       process.exitCode = exitCode;
     });
 }
+
+program
+  .command("analyze")
+  .description("Analyze a local repository and emit a structural report")
+  .argument("<path>", "path to the repository root")
+  .option("--json", "emit machine-readable JSON output", false)
+  .action((path: string, opts: { json: boolean }) => {
+    process.exitCode = runCommand(() => analyze(path, { json: opts.json }));
+  });
 
 const policy = program.command("policy").description("Policy tooling");
 

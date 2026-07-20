@@ -170,12 +170,13 @@ a command whose failure would be misread.
 | `proofforge evidence verify <file>` | Structure + hash + signature verification | ✅ |
 | `proofforge policy validate <file>` | Validate a policy file | ✅ |
 | `proofforge policy evaluate <policy> <manifest>` | Judge a manifest against a policy | ✅ |
-| `proofforge analyze <path>` | Analyze a repository from the CLI | 🔜 not wired |
+| `proofforge analyze <path>` | Analyze a repository's structure | ✅ |
 | `proofforge init` | Scaffold a policy file | 🔜 not wired |
 | `proofforge run --task "..."` | Run an agent task | 🔜 not wired to the CLI |
 
-The repository analyzer runs as a service today; the `analyze` command has not been wired
-to it. See [docs/cli.md](./docs/cli.md) for usage and exit codes.
+`analyze` runs the Python analyzer service, so it needs **uv** on the path; without it the
+command says the analyzer is missing rather than reporting a repository with nothing in it.
+See [docs/cli.md](./docs/cli.md) for usage and exit codes.
 
 ## The proof-manifest
 

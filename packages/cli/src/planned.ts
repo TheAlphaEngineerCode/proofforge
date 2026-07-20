@@ -25,11 +25,6 @@ export const PLANNED: readonly PlannedCommand[] = [
     note: "not implemented yet",
   },
   {
-    name: "analyze",
-    description: "Analyze a local repository and emit a structural report",
-    note: "the analyzer runs as a service; this command is not wired to it",
-  },
-  {
     name: "run",
     description: "Run an agent task against a repository",
     note: "agents are not wired into the CLI yet",
