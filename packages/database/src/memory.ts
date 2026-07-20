@@ -264,8 +264,10 @@ export class InMemoryStorage implements Storage {
   }
 
   async listAuditLogs(organizationId: string): Promise<AuditLog[]> {
-    return this.auditLogs
-      .filter((entry) => entry.organizationId === organizationId)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // Reverse insertion order, not a sort on the timestamp. The list is
+    // append-only, so insertion order is already chronological — and two entries
+    // written in the same millisecond carry the same timestamp, which would make
+    // a sort return them in an order nothing guarantees.
+    return this.auditLogs.filter((entry) => entry.organizationId === organizationId).reverse();
   }
 }

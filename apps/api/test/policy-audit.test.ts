@@ -128,18 +128,20 @@ describe("waiving a rule", () => {
 });
 
 describe("the audit log itself", () => {
-  it("keeps entries newest first", async () => {
+  it("returns entries newest first, even within the same millisecond", async () => {
     const storage = new InMemoryStorage();
     const user = await storage.createUser({ name: "a", email: "a@example.com" });
     const org = await storage.createOrganization({ name: "o", slug: "o", ownerId: user.id });
 
-    await storage.recordAuditLog({ organizationId: org.id, actorType: "system", action: "first" });
-    await storage.recordAuditLog({ organizationId: org.id, actorType: "system", action: "second" });
+    // Fast enough that the timestamps collide, which is exactly the case a sort
+    // on createdAt cannot order.
+    for (const action of ["first", "second", "third"]) {
+      await storage.recordAuditLog({ organizationId: org.id, actorType: "system", action });
+    }
 
     const actions = (await storage.listAuditLogs(org.id)).map((entry) => entry.action);
 
-    expect(actions).toContain("first");
-    expect(actions).toContain("second");
+    expect(actions).toEqual(["third", "second", "first"]);
   });
 
   it("does not leak entries across organizations", async () => {

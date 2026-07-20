@@ -92,7 +92,10 @@ export class PolicyGate {
     manifest: Manifest,
     report: PolicyReport,
   ): Promise<void> {
-    const waived = [...report.passed, ...report.warnings].filter(
+    // Waived rules land in `warnings` today. Scanning every bucket anyway means
+    // a change to where the engine files them cannot quietly stop the auditing —
+    // a waiver that goes unlogged is precisely the one worth logging.
+    const waived = [...report.passed, ...report.warnings, ...report.failed].filter(
       (outcome) => outcome.waivedBy !== undefined,
     );
 
