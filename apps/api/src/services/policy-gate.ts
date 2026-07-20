@@ -64,6 +64,16 @@ export class PolicyGate {
       return { finalStatus: "WAITING_FOR_HUMAN_APPROVAL" };
     }
 
+    // Same ordering constraint the agent recorder has: writing outcomes changes
+    // the document and re-stamps its hash, so a signature made earlier would
+    // cover contents that no longer exist. There is no key here to re-sign with.
+    if (manifest.signature.value !== "") {
+      throw new Error(
+        "the manifest is already signed; evaluate the policy before signing, " +
+          "since recording the outcomes now would leave a signature that no longer matches",
+      );
+    }
+
     manifest.policies = {
       passed: report.passed.map(toOutcome),
       failed: report.failed.map(toOutcome),

@@ -28,6 +28,25 @@ export interface AgentReviewResult {
   readonly failureReason?: string;
 }
 
+/**
+ * Anything that rewrites a manifest has to run before it is signed.
+ *
+ * Recording the agent changes the document and re-stamps its hash, which leaves
+ * an existing signature covering contents that no longer exist. A verifier would
+ * report that as invalid — correctly, and indistinguishably from tampering. We
+ * have no key here to re-sign with, so the only honest options are to refuse or
+ * to strip the signature, and stripping one silently is how a pipeline ends up
+ * shipping unsigned manifests nobody noticed.
+ */
+function assertUnsigned(manifest: Manifest): void {
+  if (manifest.signature.value !== "") {
+    throw new Error(
+      "the manifest is already signed; record the agent before signing, " +
+        "since rewriting it now would leave a signature that no longer matches",
+    );
+  }
+}
+
 export class AgentReviewer {
   constructor(
     private readonly provider: AiProvider,
@@ -41,6 +60,8 @@ export class AgentReviewer {
    * document whose hash does not match its contents is worse than useless.
    */
   async review(manifest: Manifest, diff: string, description?: string): Promise<AgentReviewResult> {
+    assertUnsigned(manifest);
+
     const outcome = await reviewChange(this.provider, { diff, description });
 
     const usage = outcome.usage;

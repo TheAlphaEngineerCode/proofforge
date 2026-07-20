@@ -32,8 +32,11 @@ export interface TaskRequest {
  * assembling an object literal — the caller has to name who approved it.
  */
 export class PlanApproval {
-  private readonly brand = Symbol.for("proofforge.plan-approval");
-
+  // The private constructor is the whole guarantee: callers cannot assemble one
+  // from an object literal, so an approval always came through `grant`. A brand
+  // symbol was here and did nothing — `Symbol.for` is globally registered, so
+  // anyone can retrieve it, and a guard that only looks like one is worse than
+  // none.
   private constructor(
     readonly plan: Plan,
     readonly approvedBy: string,
@@ -63,11 +66,6 @@ export class PlanApproval {
       }
     }
     return new PlanApproval(plan, approvedBy, approved);
-  }
-
-  /** Silences the unused-member warning while keeping the brand private. */
-  toString(): string {
-    return `PlanApproval(${String(this.brand.description)}, by ${this.approvedBy})`;
   }
 }
 

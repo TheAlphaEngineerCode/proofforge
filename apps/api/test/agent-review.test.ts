@@ -103,3 +103,33 @@ describe("the agent's reach", () => {
     expect(result.injectionSignals).toContain("override-instructions");
   });
 });
+
+
+describe("ordering against the signature", () => {
+  it("refuses to rewrite a manifest that is already signed", async () => {
+    const manifest = buildManifestFixture();
+    manifest.signature = {
+      algorithm: "ed25519",
+      publicKeyId: "abc123",
+      value: "c2lnbmF0dXJl",
+    };
+    const provider = new FakeProvider([JSON.stringify({ findings: [] })]);
+
+    // Recording the agent re-stamps the hash, which would leave the signature
+    // covering contents that no longer exist — indistinguishable from tampering.
+    await expect(new AgentReviewer(provider, silent).review(manifest, DIFF)).rejects.toThrow(
+      /already signed/,
+    );
+  });
+
+  it("makes no model call when it refuses", async () => {
+    const manifest = buildManifestFixture();
+    manifest.signature = { algorithm: "ed25519", publicKeyId: "abc", value: "c2ln" };
+    const provider = new FakeProvider([JSON.stringify({ findings: [] })]);
+
+    await expect(new AgentReviewer(provider, silent).review(manifest, DIFF)).rejects.toThrow();
+
+    // Checked before spending, so a misordered pipeline does not pay for it.
+    expect(provider.requests).toHaveLength(0);
+  });
+});
