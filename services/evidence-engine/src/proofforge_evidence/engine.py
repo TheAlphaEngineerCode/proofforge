@@ -14,6 +14,7 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
+from proofforge_evidence import changed_coverage
 from proofforge_evidence.collectors import parsers
 from proofforge_evidence.context import Artifact, ChangeContext
 from proofforge_evidence.manifest_builder import build_manifest
@@ -68,7 +69,7 @@ class EvidenceEngine:
         evidence = ConsolidatedEvidence()
         artifacts: list[Artifact] = []
 
-        self._collect_tests(repo, evidence, artifacts, artifacts_dir)
+        self._collect_tests(repo, context, evidence, artifacts, artifacts_dir)
         self._collect_secrets(repo, evidence, artifacts, artifacts_dir)
         self._collect_sast(repo, evidence, artifacts, artifacts_dir)
         self._collect_vulnerabilities(repo, evidence, artifacts, artifacts_dir)
@@ -88,7 +89,12 @@ class EvidenceEngine:
     # ── individual collectors ───────────────────────────────────────────────
 
     def _collect_tests(
-        self, repo: Path, evidence: ConsolidatedEvidence, artifacts: list[Artifact], out: Path
+        self,
+        repo: Path,
+        context: ChangeContext,
+        evidence: ConsolidatedEvidence,
+        artifacts: list[Artifact],
+        out: Path,
     ) -> None:
         junit, coverage = self._toolchain.run_tests(repo)
         run = CollectorRun(name="tests", status=junit.status, detail=junit.detail,
@@ -120,12 +126,48 @@ class EvidenceEngine:
                 coverage_run.status, coverage_run.detail = "error", str(err)
             else:
                 evidence.tests.coverage_total = total
-                evidence.tests.coverage_changed = total  # approximate until diff-aware
                 evidence.tests.coverage_collected = True
                 artifacts.append(self._persist("coverage.xml", "coverage", coverage.text, out))
 
         evidence.runs.append(run)
         evidence.runs.append(coverage_run)
+        self._collect_changed_coverage(repo, context, coverage, evidence)
+
+    def _collect_changed_coverage(
+        self,
+        repo: Path,
+        context: ChangeContext,
+        coverage: RawOutput,
+        evidence: ConsolidatedEvidence,
+    ) -> None:
+        """Coverage over the added lines, recorded with its own provenance.
+
+        Separate from the coverage collector because they fail independently: a
+        report can exist while the diff cannot be read, and the answer then is
+        "unknown", not the repository total. Feeding the total into this field
+        would let a policy approve a change on the strength of tests written for
+        code it never touched.
+        """
+
+        if coverage.status != "ok" or coverage.text is None:
+            result = changed_coverage.unavailable("no coverage report to measure against")
+        else:
+            result = changed_coverage.compute(
+                repo, context.base_commit, context.commit, coverage.text
+            )
+
+        if result.percentage is not None:
+            evidence.tests.coverage_changed = result.percentage
+            evidence.tests.coverage_changed_measured = True
+
+        evidence.runs.append(
+            CollectorRun(
+                name="changed-coverage",
+                status="ok" if result.measured else "unavailable",
+                detail=result.detail
+                or f"{result.covered_lines}/{result.measured_lines} added lines covered",
+            )
+        )
 
     def _collect_secrets(
         self, repo: Path, evidence: ConsolidatedEvidence, artifacts: list[Artifact], out: Path

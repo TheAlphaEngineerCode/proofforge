@@ -82,6 +82,45 @@ def parse_cobertura_line_rate(xml_text: str) -> float:
         raise ParseError(f"invalid line-rate: {rate}") from err
 
 
+def parse_cobertura_line_hits(xml_text: str) -> dict[str, dict[int, int]]:
+    """Hit counts per line, keyed by the filename Cobertura reports.
+
+    Needed for coverage of the changed lines specifically: the top-level
+    line-rate covers the whole repository, which answers a different question
+    and flatters a change that touched untested code inside a well-tested repo.
+    """
+
+    try:
+        root = ElementTree.fromstring(xml_text)
+    except ElementTree.ParseError as err:
+        raise ParseError(f"invalid Cobertura XML: {err}") from err
+
+    files: dict[str, dict[int, int]] = {}
+    for class_element in root.iter("class"):
+        filename = class_element.get("filename")
+        if not filename:
+            continue
+        lines = files.setdefault(_normalise_path(filename), {})
+        for line in class_element.iter("line"):
+            number = line.get("number")
+            if number is None:
+                continue
+            try:
+                lines[int(number)] = int(line.get("hits", "0") or "0")
+            except ValueError:
+                # A malformed line entry is not worth failing the whole report
+                # over; it just does not contribute a measurement.
+                continue
+    return files
+
+
+def _normalise_path(path: str) -> str:
+    """Compare paths the way both sides write them: forward slashes, no ./ prefix."""
+
+    cleaned = path.replace("\\", "/").lstrip("./")
+    return cleaned
+
+
 # ── secrets: Gitleaks JSON ──────────────────────────────────────────────────
 
 

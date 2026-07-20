@@ -28,6 +28,8 @@ class TestEvidence(BaseModel):
     # Coverage restricted to lines touched by the change. Until diff-aware
     # coverage lands this mirrors the total and is flagged as approximate.
     coverage_changed: float = 0.0
+    #: False means nobody measured it, which a bare 0.0 cannot express.
+    coverage_changed_measured: bool = False
     coverage_is_approximate: bool = True
     #: Whether a coverage report was actually parsed. Without this, an absent
     #: report is indistinguishable from a genuine 0% and gets charged as one.

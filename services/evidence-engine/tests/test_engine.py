@@ -84,12 +84,13 @@ def test_engine_builds_bundle_and_consolidates_evidence(
     assert {r.name for r in ev.runs} == {
         "tests",
         "coverage",
+        "changed-coverage",
         "secrets",
         "sast",
         "vulnerabilities",
         "sbom",
     }
-    assert all(r.status == "ok" for r in ev.runs)
+    assert all(r.status == "ok" for r in ev.runs if r.name != "changed-coverage")
 
 
 def test_manifest_is_schema_shaped_and_self_consistent(
@@ -147,12 +148,13 @@ def test_manifest_records_collector_provenance(tmp_path, read_fixture) -> None:
     assert {c["name"] for c in collectors} == {
         "tests",
         "coverage",
+        "changed-coverage",
         "secrets",
         "sast",
         "vulnerabilities",
         "sbom",
     }
-    assert all(c["status"] == "ok" for c in collectors)
+    assert all(c["status"] == "ok" for c in collectors if c["name"] != "changed-coverage")
 
 
 def test_unmeasured_security_signals_raise_risk(tmp_path) -> None:

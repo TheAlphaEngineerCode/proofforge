@@ -40,8 +40,11 @@ const REQUIRES: Record<string, string> = {
   "security.sbomRequired": "sbom",
   "tests.maxFailedTests": "tests",
   "tests.testsRequired": "tests",
-  // Coverage has its own collector: a missing report must not be judged as 0%.
-  "tests.minChangedLinesCoverage": "coverage",
+  // Coverage over the changed lines is measured separately from coverage as a
+  // whole, and fails separately too: the report can exist while the diff cannot
+  // be read. Pointing this rule at the whole-repository collector would let it
+  // pass on a figure that describes code the change never touched.
+  "tests.minChangedLinesCoverage": "changed-coverage",
 };
 
 export function evaluatePolicy(policy: Policy, manifest: Manifest): PolicyReport {
