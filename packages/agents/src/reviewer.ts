@@ -13,6 +13,9 @@ import { encloseUntrusted, UNTRUSTED_CONTENT_RULES } from "@proofforge/ai-provid
 import type { AiProvider, CompletionResult } from "@proofforge/ai-providers";
 import { z } from "zod";
 
+import { describeError } from "./outcome.js";
+import { parseJsonReply } from "./parse.js";
+
 export const SEVERITIES = ["critical", "high", "medium", "low"] as const;
 
 const FindingSchema = z.object({
@@ -99,7 +102,7 @@ export async function reviewChange(
     });
   } catch (error) {
     // A transport failure is not a clean review either.
-    return { status: "failed", reason: `the provider call failed: ${messageOf(error)}`, usage: null };
+    return { status: "failed", reason: `the provider call failed: ${describeError(error)}`, usage: null };
   }
 
   if (result.stopReason !== "end_turn") {
@@ -110,122 +113,15 @@ export async function reviewChange(
     };
   }
 
-  const parsed = parseReply(result.text);
+  const parsed = parseJsonReply(result.text, ReplySchema, "finding");
   if (!parsed.ok) {
     return { status: "failed", reason: parsed.reason, usage: result.usage };
   }
 
   return {
     status: "reviewed",
-    findings: parsed.findings,
+    findings: parsed.value.findings,
     injectionSignals: signals,
     usage: result.usage,
   };
-}
-
-type ParseResult =
-  | { readonly ok: true; readonly findings: readonly Finding[] }
-  | { readonly ok: false; readonly reason: string };
-
-function parseReply(text: string): ParseResult {
-  const candidates = [...balancedObjects(text)];
-  if (candidates.length === 0) {
-    return { ok: false, reason: "the model's reply contained no JSON object" };
-  }
-
-  // Prose around the answer may itself contain braces — a sentence quoting
-  // `if (x) { return true; }` reads as an object and parses as nothing. So try
-  // each candidate and keep the first that is actually a reply, rather than
-  // betting the first brace in the text opens the one we want.
-  let lastSchemaError: string | null = null;
-
-  for (const candidate of candidates) {
-    let value: unknown;
-    try {
-      value = JSON.parse(candidate);
-    } catch {
-      continue;
-    }
-
-    const parsed = ReplySchema.safeParse(value);
-    if (parsed.success) {
-      return { ok: true, findings: parsed.data.findings };
-    }
-    // Partial conformance is still a failure: silently dropping the findings
-    // that did not fit would understate what the model reported.
-    lastSchemaError = parsed.error.issues
-      .slice(0, 3)
-      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
-      .join("; ");
-  }
-
-  return {
-    ok: false,
-    reason:
-      lastSchemaError === null
-        ? "the model's reply contained no valid JSON object"
-        : `the model's reply did not match the finding schema: ${lastSchemaError}`,
-  };
-}
-
-/**
- * Every balanced `{...}` span in the text, outermost first.
- *
- * Quote and escape tracking is what keeps a brace inside a string — a finding
- * quoting code — from closing the object early.
- */
-function* balancedObjects(text: string): Generator<string> {
-  for (let start = text.indexOf("{"); start !== -1; start = text.indexOf("{", start + 1)) {
-    const end = matchingBrace(text, start);
-    if (end !== null) yield text.slice(start, end + 1);
-  }
-}
-
-function matchingBrace(text: string, start: number): number | null {
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = start; i < text.length; i += 1) {
-    const char = text[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (char === '"') {
-      inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-
-    if (char === "{") depth += 1;
-    else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) return i;
-    }
-  }
-
-  return null;
-}
-
-function messageOf(error: unknown): string {
-  return redactCredentials(error instanceof Error ? error.message : String(error));
-}
-
-/**
- * A failure reason is copied into the manifest, and manifests get published.
- *
- * Provider errors quote the request that failed, and a request carries an API
- * key. Redacting here rather than at the point of publication keeps a secret
- * from being written down in the first place.
- */
-function redactCredentials(text: string): string {
-  return text
-    .replace(/\b(sk|pk|ghp|gho|ghs|ghu|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}/gi, "$1-[redacted]")
-    .replace(/\b(bearer|authorization|x-api-key)\b(\s*[:=]\s*|\s+)\S+/gi, "$1$2[redacted]");
 }

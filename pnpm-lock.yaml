@@ -47,6 +47,12 @@ importers:
       '@fastify/cors':
         specifier: ^10.0.2
         version: 10.1.0
+      '@proofforge/agents':
+        specifier: workspace:*
+        version: link:../../packages/agents
+      '@proofforge/ai-providers':
+        specifier: workspace:*
+        version: link:../../packages/ai-providers
       '@proofforge/database':
         specifier: workspace:*
         version: link:../../packages/database

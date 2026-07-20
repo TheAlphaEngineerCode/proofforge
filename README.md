@@ -8,7 +8,7 @@ _Engenharia de software autônoma com mudanças verificáveis_
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Spec: proof-manifest 1.1.0](https://img.shields.io/badge/proof--manifest-1.1.0-8A2BE2.svg)](./docs/evidence-spec.md)
-[![Status: Phases 0–6](https://img.shields.io/badge/status-phases_0--6-brightgreen.svg)](./ROADMAP.md)
+[![Status: Phases 0–7](https://img.shields.io/badge/status-phases_0--7-brightgreen.svg)](./ROADMAP.md)
 
 </div>
 
@@ -172,7 +172,7 @@ a command whose failure would be misread.
 | `proofforge policy evaluate <policy> <manifest>` | Judge a manifest against a policy | ✅ |
 | `proofforge analyze <path>` | Analyze a repository from the CLI | 🔜 not wired |
 | `proofforge init` | Scaffold a policy file | 🔜 not wired |
-| `proofforge run --task "..."` | Run an agent task | 🔜 Phase 7 |
+| `proofforge run --task "..."` | Run an agent task | 🔜 not wired to the CLI |
 
 The repository analyzer runs as a service today; the `analyze` command has not been wired
 to it. See [docs/cli.md](./docs/cli.md) for usage and exit codes.
@@ -200,14 +200,29 @@ already prove things. Full plan in [ROADMAP.md](./ROADMAP.md).
 - **Phase 4** — API + Dashboard ✅
 - **Phase 5** — GitHub App ✅
 - **Phase 6** — Risk & Policy engines ✅
-- **Phase 7** — AI agents (provider-neutral) — 🔨 in progress
+- **Phase 7** — AI agents (provider-neutral) ✅
 - **Phase 8** — Distributed workers
 - **Phase 9** — SDK & plugins
 
-Phase 7 so far provides the provider interface, cost accounting, containment for untrusted
-repository content, and a reviewer agent. No agent is wired into the pipeline yet, and no
-agent has been exercised against a live model — the tests script the provider, which covers
-the orchestration and says nothing about how a model actually answers.
+### What Phase 7 contains, and what it has not been through
+
+Built: a provider-neutral completion interface with an Anthropic implementation, cost
+accounting, containment for untrusted repository content, a planning agent, an
+implementation agent, a reviewer agent, a per-run budget, and an approval gate between
+planning and implementation.
+
+**No agent has been run against a live model.** The tests script the provider, which
+exercises the orchestration — parsing, containment, budgets, the gate — and says nothing
+about how a model actually answers. Two consequences worth stating plainly:
+
+- The prompts are unproven. Whether a real model returns output matching these schemas is
+  an empirical question no test here answers.
+- The containment is proven structurally and not behaviourally. Untrusted content cannot
+  escape its block — the delimiter is a fresh nonce, and that is arithmetic. Whether a model
+  *obeys* the instruction to treat that block as data is not something a scripted provider
+  can demonstrate.
+
+Agent mode is therefore not something to point at a repository you care about yet.
 
 ## Contributing
 

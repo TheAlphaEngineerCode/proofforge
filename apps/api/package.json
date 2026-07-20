@@ -24,7 +24,9 @@
     "@proofforge/shared-types": "workspace:*",
     "fastify": "^5.2.1",
     "zod": "^3.24.1",
-    "@proofforge/policy-engine": "workspace:*"
+    "@proofforge/policy-engine": "workspace:*",
+    "@proofforge/agents": "workspace:*",
+    "@proofforge/ai-providers": "workspace:*"
   },
   "devDependencies": {
     "tsup": "^8.3.5",
