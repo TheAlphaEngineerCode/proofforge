@@ -128,44 +128,60 @@ type ParseResult =
   | { readonly ok: false; readonly reason: string };
 
 function parseReply(text: string): ParseResult {
-  const json = extractJsonObject(text);
-  if (json === null) {
+  const candidates = [...balancedObjects(text)];
+  if (candidates.length === 0) {
     return { ok: false, reason: "the model's reply contained no JSON object" };
   }
 
-  let value: unknown;
-  try {
-    value = JSON.parse(json);
-  } catch (error) {
-    return { ok: false, reason: `the model's reply was not valid JSON: ${messageOf(error)}` };
-  }
+  // Prose around the answer may itself contain braces — a sentence quoting
+  // `if (x) { return true; }` reads as an object and parses as nothing. So try
+  // each candidate and keep the first that is actually a reply, rather than
+  // betting the first brace in the text opens the one we want.
+  let lastSchemaError: string | null = null;
 
-  const parsed = ReplySchema.safeParse(value);
-  if (!parsed.success) {
+  for (const candidate of candidates) {
+    let value: unknown;
+    try {
+      value = JSON.parse(candidate);
+    } catch {
+      continue;
+    }
+
+    const parsed = ReplySchema.safeParse(value);
+    if (parsed.success) {
+      return { ok: true, findings: parsed.data.findings };
+    }
     // Partial conformance is still a failure: silently dropping the findings
     // that did not fit would understate what the model reported.
-    return {
-      ok: false,
-      reason: `the model's reply did not match the finding schema: ${parsed.error.issues
-        .slice(0, 3)
-        .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
-        .join("; ")}`,
-    };
+    lastSchemaError = parsed.error.issues
+      .slice(0, 3)
+      .map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`)
+      .join("; ");
   }
 
-  return { ok: true, findings: parsed.data.findings };
+  return {
+    ok: false,
+    reason:
+      lastSchemaError === null
+        ? "the model's reply contained no valid JSON object"
+        : `the model's reply did not match the finding schema: ${lastSchemaError}`,
+  };
 }
 
 /**
- * Pull the JSON object out of a reply that may be fenced or wrapped in prose.
+ * Every balanced `{...}` span in the text, outermost first.
  *
- * Scanning for the matching brace rather than taking the last one keeps a brace
- * inside a string — a finding quoting code, say — from truncating the object.
+ * Quote and escape tracking is what keeps a brace inside a string — a finding
+ * quoting code — from closing the object early.
  */
-function extractJsonObject(text: string): string | null {
-  const start = text.indexOf("{");
-  if (start === -1) return null;
+function* balancedObjects(text: string): Generator<string> {
+  for (let start = text.indexOf("{"); start !== -1; start = text.indexOf("{", start + 1)) {
+    const end = matchingBrace(text, start);
+    if (end !== null) yield text.slice(start, end + 1);
+  }
+}
 
+function matchingBrace(text: string, start: number): number | null {
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -190,7 +206,7 @@ function extractJsonObject(text: string): string | null {
     if (char === "{") depth += 1;
     else if (char === "}") {
       depth -= 1;
-      if (depth === 0) return text.slice(start, i + 1);
+      if (depth === 0) return i;
     }
   }
 
@@ -198,5 +214,18 @@ function extractJsonObject(text: string): string | null {
 }
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return redactCredentials(error instanceof Error ? error.message : String(error));
+}
+
+/**
+ * A failure reason is copied into the manifest, and manifests get published.
+ *
+ * Provider errors quote the request that failed, and a request carries an API
+ * key. Redacting here rather than at the point of publication keeps a secret
+ * from being written down in the first place.
+ */
+function redactCredentials(text: string): string {
+  return text
+    .replace(/\b(sk|pk|ghp|gho|ghs|ghu|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}/gi, "$1-[redacted]")
+    .replace(/\b(bearer|authorization|x-api-key)\b(\s*[:=]\s*|\s+)\S+/gi, "$1$2[redacted]");
 }

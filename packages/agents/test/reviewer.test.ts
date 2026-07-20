@@ -56,6 +56,20 @@ describe("a review that happened", () => {
     expect(outcome.status).toBe("reviewed");
   });
 
+  it("finds the reply behind prose that quotes braced code", async () => {
+    // The model explaining itself before answering is normal, and the brace in
+    // that explanation must not be mistaken for the start of the reply.
+    const provider = new FakeProvider([
+      `The guard \`if (x) { return true; }\` was removed.\n\n${reply([FINDING])}`,
+    ]);
+
+    const outcome = await reviewChange(provider, { diff: DIFF });
+
+    expect(outcome.status).toBe("reviewed");
+    if (outcome.status !== "reviewed") return;
+    expect(outcome.findings).toHaveLength(1);
+  });
+
   it("is not truncated by a brace inside a quoted finding", async () => {
     const withBrace = { ...FINDING, summary: "The guard `if (x) { return true; }` is gone." };
     const provider = new FakeProvider([reply([withBrace])]);
@@ -106,6 +120,22 @@ describe("a review that did not happen", () => {
     expect(outcome.status).toBe("failed");
     if (outcome.status !== "failed") return;
     expect(outcome.reason).toContain("connection reset");
+  });
+
+  it("does not write a credential into the reason, which the manifest keeps", async () => {
+    const leaky = {
+      name: "leaky",
+      model: "none",
+      complete: () =>
+        Promise.reject(new Error("401 from https://api.example/v1 (x-api-key: sk-ant-abcd1234efgh)")),
+    };
+
+    const outcome = await reviewChange(leaky, { diff: DIFF });
+
+    if (outcome.status !== "failed") throw new Error("expected a failure");
+    expect(outcome.reason).not.toContain("sk-ant-abcd1234efgh");
+    // Still says enough to debug with.
+    expect(outcome.reason).toContain("401");
   });
 
   it("keeps the reason specific enough to act on", async () => {
