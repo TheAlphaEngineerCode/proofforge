@@ -37,15 +37,11 @@ class Signer:
 
         return base64.b64encode(self._key.sign(evidence_hash.encode("utf-8"))).decode("ascii")
 
-    def public_key_pem(self) -> str:
-        return (
-            self._key.public_key()
-            .public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            )
-            .decode("ascii")
-        )
+    # Deliberately no way to export the public key into the bundle. Shipping it
+    # next to the signature would prove nothing — anyone can sign with a key of
+    # their own and enclose the matching public half. A verifier has to hold the
+    # key already; `public_key_id` is how they tell whether they hold the right
+    # one.
 
 
 def load_signer(key_path: Path) -> Signer:

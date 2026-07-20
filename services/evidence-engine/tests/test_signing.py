@@ -8,6 +8,7 @@ import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+from proofforge_evidence.cli import main
 from proofforge_evidence.context import ChangeContext, RepositoryRef
 from proofforge_evidence.manifest_builder import build_manifest
 from proofforge_evidence.manifest_hash import compute_evidence_hash
@@ -144,3 +145,45 @@ class TestSigningAManifest:
         ).strip()
 
         assert body not in serialised
+
+
+class TestTheCommandLine:
+    """The guarantee the CLI makes: asking for a signature you cannot get fails."""
+
+    def _args(self, repo: Path, out: Path, key: str) -> list[str]:
+        return [
+            "build",
+            "--repo", str(repo),
+            "--owner", "acme", "--name", "api",
+            "--url", "https://github.com/acme/api",
+            "--commit", "9c82fd1a2b3c4d5e6f708192a3b4c5d6e7f80912",
+            "--base", "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+            "--branch", "main",
+            "--output-dir", str(out),
+            "--signing-key", key,
+        ]
+
+    def test_an_unusable_key_fails_instead_of_writing_an_unsigned_bundle(
+        self, tmp_path: Path, capsys
+    ) -> None:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        out = tmp_path / "bundle"
+
+        exit_code = main(self._args(repo, out, str(tmp_path / "missing.pem")))
+
+        assert exit_code == 2
+        # No bundle at all: a caller who asked for a signature gets nothing
+        # rather than something they would assume was signed.
+        assert not (out / "proof-manifest.json").exists()
+        assert "could not read the signing key" in capsys.readouterr().err
+
+    def test_the_error_does_not_quote_the_key(self, tmp_path: Path, capsys) -> None:
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        secret = "NOTAREALKEYBUTSECRETLOOKING"
+        bad = tmp_path / "bad.pem"
+        bad.write_text("-----BEGIN PRIVATE KEY-----\n" + secret + "\n", encoding="utf-8")
+
+        assert main(self._args(repo, tmp_path / "b", str(bad))) == 2
+        assert secret not in capsys.readouterr().err
