@@ -7,6 +7,7 @@
 import type { Manifest } from "@proofforge/evidence-spec";
 import { evaluateManifest } from "./checks.js";
 import { inlineText } from "./markdown.js";
+import { collectorRan } from "./provenance.js";
 
 export const COMMENT_MARKER = "<!-- proofforge:verification -->";
 
@@ -38,9 +39,11 @@ export function renderPullRequestComment(manifest: Manifest): string {
     );
   }
   // A zero only means "clean" if the collector actually ran. Manifest provenance
-  // (spec 1.1.0) lets us say "not measured" instead of implying a pass.
-  const ran = (collector: string): boolean =>
-    manifest.collectors.some((entry) => entry.name === collector && entry.status === "ok");
+  // (spec 1.1.0) lets us say "not measured" instead of implying a pass. Shared
+  // with the check run rather than reimplemented: the two had already drifted
+  // once, with the check run reporting "Secrets detected: 0" for a scan that
+  // never happened while this surface knew better.
+  const ran = (collector: string): boolean => collectorRan(manifest, collector);
 
   lines.push(
     !ran("secrets")
@@ -71,7 +74,7 @@ export function renderPullRequestComment(manifest: Manifest): string {
   // Same reason as the check run: these fields default to a safe answer, so
   // reporting them without provenance turns silence into reassurance.
   if (!ran("operations")) {
-    lines.push(warn("Migrations and rollback were not checked - unverified"));
+    lines.push(warn("Migrations and rollback were not checked — unverified"));
   } else {
     if (operations.migrationsDetected) {
       lines.push(
