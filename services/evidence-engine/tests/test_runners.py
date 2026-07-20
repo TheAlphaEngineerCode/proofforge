@@ -60,6 +60,19 @@ class TestPlans:
         """A failing suite is evidence, not a runner error — collect it either way."""
         assert runners.plan_for(stack).script.rstrip().endswith("|| true")
 
+    @pytest.mark.parametrize("stack", ["pytest", "vitest"])
+    def test_no_runner_writes_into_the_output_mount_point(self, stack: str) -> None:
+        """A tool that clears its report directory must not be aimed at the mount.
+
+        vitest's coverage provider removes the reports directory before writing;
+        under a read-only root that is EROFS on a mount point, and it takes the
+        whole run down rather than just coverage.
+        """
+        script = runners.plan_for(stack).script
+
+        assert f"reportsDirectory={runners.OUTPUT_DIR}" not in script
+        assert f"--cov-report=xml:{runners.OUTPUT_DIR} " not in script
+
     def test_unknown_stack(self) -> None:
         with pytest.raises(runners.UnsupportedStackError):
             runners.plan_for("maven")

@@ -93,9 +93,17 @@ def plan_for(stack: str) -> RunnerPlan:
             script=_script(
                 install="if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; "
                 "elif [ -f package-lock.json ]; then npm ci; else npm install; fi",
+                # Coverage is written inside the working volume, then copied
+                # out. Pointing vitest at the output mount directly fails: its
+                # coverage provider clears the reports directory first, and
+                # rmdir on a mount point under a read-only root is EROFS — which
+                # takes the whole run down, not just coverage. The copy also
+                # renames cobertura's own filename to the one the engine reads.
                 test=f"npx vitest run --reporter=junit --outputFile={JUNIT_PATH} "
                 f"--coverage --coverage.reporter=cobertura "
-                f"--coverage.reportsDirectory={OUTPUT_DIR} || true",
+                f"--coverage.reportsDirectory={WORK_DIR}/coverage || true; "
+                f"cp {WORK_DIR}/coverage/cobertura-coverage.xml {COVERAGE_PATH} 2>/dev/null "
+                f"|| true",
             ),
         )
 
