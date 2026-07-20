@@ -3,6 +3,7 @@ import type { AnalysisEvent } from "@proofforge/shared-types";
 import { describe, expect, it } from "vitest";
 import { EventBus } from "../src/events.js";
 import { AnalysisRunner } from "../src/services/analysis-runner.js";
+import { ANALYSES_TOTAL, createMetrics } from "../src/observability.js";
 
 async function seedAnalysis(storage: InMemoryStorage): Promise<string> {
   const user = await storage.createUser({ name: "u", email: "u@x.com" });
@@ -80,5 +81,30 @@ describe("AnalysisRunner", () => {
 
     expect((await storage.getAnalysis(analysis.id))?.status).toBe("FAILED");
     expect(received.some((e) => e.type === "error")).toBe(true);
+  });
+
+  it("counts a run once, even when it fails after reaching its terminal state", async () => {
+    // The completed event is published after the status is already persisted.
+    // A throw there used to be counted twice — once under the terminal status
+    // and once as FAILED — so the totals claimed more analyses than ever ran.
+    class BrokenBus extends EventBus {
+      override publish(analysisId: string, event: AnalysisEvent): void {
+        if (event.type === "completed") throw new Error("subscriber blew up");
+        super.publish(analysisId, event);
+      }
+    }
+
+    const storage = new InMemoryStorage();
+    const metrics = createMetrics();
+    const runner = new AnalysisRunner(storage, new BrokenBus(), 0, undefined, undefined, undefined, metrics);
+    const analysisId = await seedAnalysis(storage);
+
+    await runner.start(analysisId);
+
+    const counted = metrics
+      .render()
+      .split("\n")
+      .filter((line) => line.startsWith(ANALYSES_TOTAL));
+    expect(counted).toEqual([`${ANALYSES_TOTAL}{status="FAILED"} 1`]);
   });
 });

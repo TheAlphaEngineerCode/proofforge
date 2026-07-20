@@ -132,8 +132,6 @@ export class AnalysisRunner {
       await this.storage.updateAnalysis(analysisId, { status: finalStatus });
       this.publishStatus(analysisId, finalStatus, previous);
 
-      this.record(finalStatus, startedAt);
-
       const final = await this.storage.getAnalysis(analysisId);
       this.events.publish(analysisId, {
         version: EVENT_SCHEMA_VERSION,
@@ -144,6 +142,12 @@ export class AnalysisRunner {
         evidenceBundleId: final?.evidenceBundleId ?? null,
         at: new Date().toISOString(),
       });
+
+      // Last, so a throw between here and the top of the try lands in the catch
+      // and is counted once, as FAILED. Recording earlier would count the same
+      // run twice under two different statuses, and the totals would then say
+      // more analyses ran than ever existed.
+      this.record(finalStatus, startedAt);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.record("FAILED", startedAt);

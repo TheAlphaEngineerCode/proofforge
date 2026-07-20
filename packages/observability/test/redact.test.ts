@@ -68,6 +68,23 @@ describe("redacting structures", () => {
     expect(out.apiKey).toBe("[redacted]");
   });
 
+  it.each(["accessToken", "access_token", "apiKey", "clientSecret", "githubToken"])(
+    "drops %s however it is spelled",
+    (key) => {
+      // camelCase is what this codebase actually writes, and the check used to
+      // understand only the snake_case half while looking thorough.
+      const out = redactValue({ [key]: "wouldotherwiseleak" }) as Record<string, unknown>;
+
+      expect(out[key]).toBe("[redacted]");
+    },
+  );
+
+  it("keeps a field whose name merely contains a secret-ish word", () => {
+    const out = redactValue({ tokenizer: "bpe", secretary: "ada" }) as Record<string, unknown>;
+
+    expect(out).toEqual({ tokenizer: "bpe", secretary: "ada" });
+  });
+
   it("redacts inside arrays", () => {
     const out = redactValue(["ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123"]) as string[];
 

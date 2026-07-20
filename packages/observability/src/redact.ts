@@ -61,8 +61,16 @@ export function redactValue(value: unknown, depth = 0): unknown {
   return value;
 }
 
+/**
+ * Word boundaries in a key name, including camelCase ones.
+ *
+ * Without the first step this only understood `access_token` and missed
+ * `accessToken`, which is the spelling almost every object in this codebase
+ * actually uses — the check read as thorough while covering the rarer half.
+ */
 function looksSecret(key: string): boolean {
+  const separated = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2");
   return /(^|[_-])(password|passwd|secret|token|apikey|api_key|authorization|credential)s?([_-]|$)/i.test(
-    key,
+    separated,
   );
 }
