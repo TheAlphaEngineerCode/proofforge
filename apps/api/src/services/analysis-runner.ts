@@ -8,6 +8,7 @@
  */
 import { randomUUID } from "node:crypto";
 import type { Storage } from "@proofforge/database";
+import { redact, type Metrics } from "@proofforge/observability";
 import {
   canTransition,
   EVENT_SCHEMA_VERSION,
@@ -17,6 +18,12 @@ import {
 import type { Manifest } from "@proofforge/evidence-spec";
 import type { EventBus } from "../events.js";
 import { buildAnalysisManifest } from "../manifest.js";
+import {
+  ANALYSES_TOTAL,
+  ANALYSIS_DURATION,
+  COLLECTOR_DURATION,
+  COLLECTORS_TOTAL,
+} from "../observability.js";
 import type { RepositoryCheckout } from "./checkout.js";
 import type { EvidenceProducer } from "./evidence-producer.js";
 import type { PolicyGate } from "./policy-gate.js";
@@ -50,17 +57,6 @@ const PIPELINE: readonly AnalysisStatus[] = [
 const sleep = (ms: number): Promise<void> =>
   ms <= 0 ? Promise.resolve() : new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Last line of defense before an error reaches the logs. The checkout already
- * redacts its own failures, but anything carrying a credential must never be
- * logged just because it arrived from somewhere else.
- */
-function redactSecrets(message: string): string {
-  return message
-    .replace(/x-access-token:[^@\s]+@/g, "x-access-token:***@")
-    .replace(/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "***");
-}
-
 export class AnalysisRunner {
   private readonly inflight = new Map<string, Promise<void>>();
 
@@ -71,6 +67,7 @@ export class AnalysisRunner {
     private readonly evidence?: EvidencePipeline,
     private readonly logger: RunnerLogger = { warn: (message) => console.warn(message) },
     private readonly policyGate?: PolicyGate,
+    private readonly metrics?: Metrics,
   ) {}
 
   /** Start the pipeline for an analysis. Returns a promise that resolves when it ends. */
@@ -87,6 +84,7 @@ export class AnalysisRunner {
 
   private async execute(analysisId: string): Promise<void> {
     let previous: AnalysisStatus = "CREATED";
+    const startedAt = Date.now();
     try {
       const analysis = await this.storage.getAnalysis(analysisId);
       if (!analysis) throw new Error(`analysis not found: ${analysisId}`);
@@ -107,6 +105,7 @@ export class AnalysisRunner {
             commit: analysis.commitSha,
             branch: repository.defaultBranch,
           });
+          this.recordCollectors(manifest);
         }
 
         if (status === "POLICY_VALIDATION") {
@@ -133,6 +132,8 @@ export class AnalysisRunner {
       await this.storage.updateAnalysis(analysisId, { status: finalStatus });
       this.publishStatus(analysisId, finalStatus, previous);
 
+      this.record(finalStatus, startedAt);
+
       const final = await this.storage.getAnalysis(analysisId);
       this.events.publish(analysisId, {
         version: EVENT_SCHEMA_VERSION,
@@ -145,6 +146,7 @@ export class AnalysisRunner {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      this.record("FAILED", startedAt);
       await this.storage.updateAnalysis(analysisId, { status: "FAILED", error: message });
       this.events.publish(analysisId, {
         version: EVENT_SCHEMA_VERSION,
@@ -153,6 +155,27 @@ export class AnalysisRunner {
         message,
         at: new Date().toISOString(),
       });
+    }
+  }
+
+  /** How the run ended and how long it took, as one pair so they cannot diverge. */
+  private record(status: AnalysisStatus, startedAt: number): void {
+    this.metrics?.increment(ANALYSES_TOTAL, { status });
+    this.metrics?.observe(ANALYSIS_DURATION, (Date.now() - startedAt) / 1000, { status });
+  }
+
+  /**
+   * The collector provenance, counted.
+   *
+   * The manifest already records which collectors ran; without this the fact is
+   * true once per analysis and invisible across all of them, so a collector
+   * that has been unavailable for a week reads as a week of clean results.
+   */
+  private recordCollectors(manifest: Manifest): void {
+    if (this.metrics === undefined) return;
+    for (const run of manifest.collectors) {
+      this.metrics.increment(COLLECTORS_TOTAL, { collector: run.name, status: run.status });
+      this.metrics.observe(COLLECTOR_DURATION, run.durationMs / 1000, { collector: run.name });
     }
   }
 
@@ -271,7 +294,7 @@ export class AnalysisRunner {
         branch: change.branch,
       });
     } catch (err) {
-      const message = redactSecrets(err instanceof Error ? err.message : String(err));
+      const message = redact(err instanceof Error ? err.message : String(err));
       this.logger.warn(
         `[evidence] falling back to a simulated manifest for ${owner}/${name}@${change.commit.slice(0, 7)}: ${message}`,
       );

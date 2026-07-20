@@ -23,3 +23,9 @@ warn_unused_configs = true
 
 [tool.pytest.ini_options]
 testpaths = ["services"]
+# The analyzer's fixtures are whole miniature repositories, tests included.
+# Those tests belong to the fixture, not to us: collecting them from the root
+# fails on imports that only resolve inside the fixture. CI runs pytest per
+# service, where each service's own config already excludes them — this keeps a
+# run from the repository root working the same way.
+norecursedirs = ["fixtures", ".venv", "node_modules"]

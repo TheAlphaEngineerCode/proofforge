@@ -8,6 +8,7 @@ import { authRoutes } from "./routes/auth.js";
 import { evidenceBundleRoutes } from "./routes/evidence-bundles.js";
 import { githubWebhookRoutes } from "./routes/github-webhook.js";
 import { healthRoutes } from "./routes/health.js";
+import { metricsRoutes } from "./routes/metrics.js";
 import { organizationRoutes } from "./routes/organizations.js";
 import { policyRoutes } from "./routes/policies.js";
 import { repositoryRoutes } from "./routes/repositories.js";
@@ -42,6 +43,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerAuth(app, deps.storage);
 
   healthRoutes(app);
+  metricsRoutes(app, deps);
   authRoutes(app, deps);
   organizationRoutes(app, deps);
   repositoryRoutes(app, deps);

@@ -1,18 +1,13 @@
 {
-  "name": "@proofforge/agents",
+  "name": "@proofforge/observability",
   "version": "0.1.0",
-  "description": "Specialised agents that read a change and report on it.",
+  "description": "Structured logging and metrics for the services.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    }
-  },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "files": ["dist"],
   "scripts": {
     "build": "tsup",
@@ -20,13 +15,7 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
     "clean": "rimraf dist coverage .turbo"
-  },
-  "dependencies": {
-    "@proofforge/ai-providers": "workspace:*",
-    "@proofforge/observability": "workspace:*",
-    "zod": "^3.24.1"
   },
   "devDependencies": {
     "tsup": "^8.3.5",

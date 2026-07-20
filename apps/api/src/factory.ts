@@ -13,6 +13,7 @@ import {
 import { InstallationTokenProvider, RestGitHubClient } from "@proofforge/github";
 import type { Config } from "./config.js";
 import type { AppDeps } from "./deps.js";
+import { createMetrics } from "./observability.js";
 import { EventBus } from "./events.js";
 import { AnalysisRunner, type EvidencePipeline } from "./services/analysis-runner.js";
 import { GitRepositoryCheckout } from "./services/checkout.js";
@@ -23,6 +24,7 @@ import { PolicyGate } from "./services/policy-gate.js";
 export function createDeps(config: Config, storage?: Storage): AppDeps {
   const store = storage ?? createStorage(config);
   const events = new EventBus();
+  const metrics = createMetrics();
   const logger = { warn: (message: string) => console.warn(message) };
   const runner = new AnalysisRunner(
     store,
@@ -31,10 +33,11 @@ export function createDeps(config: Config, storage?: Storage): AppDeps {
     createEvidencePipeline(config),
     logger,
     new PolicyGate(store, logger),
+    metrics,
   );
   const publisher = createPublisher(config, store);
 
-  return { storage: store, events, runner, config, ...(publisher ? { publisher } : {}) };
+  return { storage: store, events, runner, config, metrics, ...(publisher ? { publisher } : {}) };
 }
 
 /** PostgreSQL when DATABASE_URL is set, otherwise the in-memory backend. */

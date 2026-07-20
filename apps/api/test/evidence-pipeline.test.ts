@@ -6,6 +6,7 @@ import { AnalysisRunner, type EvidencePipeline } from "../src/services/analysis-
 import type { Checkout, CheckoutRequest, RepositoryCheckout } from "../src/services/checkout.js";
 import type { EvidenceProducer, EvidenceRequest } from "../src/services/evidence-producer.js";
 import { buildAnalysisManifest } from "../src/manifest.js";
+import { createMetrics } from "../src/observability.js";
 
 const silent = { warn: () => {} };
 
@@ -114,6 +115,47 @@ describe("evidence pipeline wiring", () => {
     const { analysis, manifest } = await runWith(undefined);
     expect(analysis?.riskScore).toBe(18);
     expect(manifest.risk.reasons.join(" ")).toMatch(/simulated/i);
+  });
+
+  it("counts each collector the engine reported, by status", async () => {
+    // Only the real engine fills `collectors`, so this path is never reached by
+    // the simulated manifest — which is how the wiring could go missing unseen.
+    const produced = buildAnalysisManifest({
+      id: "c4e2d3b5-6f70-4a81-9b02-3d4e5f6a7b8c",
+      owner: "acme",
+      name: "api",
+      commit: "9c82fd1a2b3c4d5e6f708192a3b4c5d6e7f80912",
+      baseCommit: "9c82fd1a2b3c4d5e6f708192a3b4c5d6e7f80912",
+      branch: "main",
+      riskScore: 20,
+      riskLevel: "low",
+    });
+    produced.collectors = [
+      { name: "coverage", status: "ok", detail: "", durationMs: 1200 },
+      { name: "sast", status: "unavailable", detail: "semgrep not installed", durationMs: 0 },
+    ];
+
+    const storage = new InMemoryStorage();
+    const analysisId = await seed(storage);
+    const metrics = createMetrics();
+    const runner = new AnalysisRunner(
+      storage,
+      new EventBus(),
+      0,
+      { checkout: new FakeCheckout(), producer: new FakeProducer(produced) },
+      silent,
+      undefined,
+      metrics,
+    );
+
+    await runner.start(analysisId);
+
+    const exposed = metrics.render();
+    expect(exposed).toContain('proofforge_collectors_total{collector="coverage",status="ok"} 1');
+    // The one that matters: a collector that never ran must not read as clean.
+    expect(exposed).toContain(
+      'proofforge_collectors_total{collector="sast",status="unavailable"} 1',
+    );
   });
 
   it("keeps the checkout token out of logs on failure", async () => {

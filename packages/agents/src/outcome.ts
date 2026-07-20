@@ -8,6 +8,7 @@
  */
 
 import type { CompletionResult } from "@proofforge/ai-providers";
+import { redact } from "@proofforge/observability";
 
 export type AgentOutcome<T> =
   | {
@@ -44,8 +45,5 @@ export function stopReasonProblem(result: CompletionResult): string | null {
 
 /** Provider errors reach the manifest, and a manifest can be published. */
 export function describeError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message
-    .replace(/\b(sk|pk|ghp|gho|ghs|ghu|github_pat|xox[baprs])[-_][A-Za-z0-9_-]{8,}/gi, "$1-[redacted]")
-    .replace(/\b(bearer|authorization|x-api-key)\b(\s*[:=]\s*|\s+)\S+/gi, "$1$2[redacted]");
+  return redact(error instanceof Error ? error.message : String(error));
 }
