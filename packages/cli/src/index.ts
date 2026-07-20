@@ -4,6 +4,7 @@ import { manifestInspect, manifestValidate } from "./commands/manifest.js";
 import { evidenceVerify } from "./commands/evidence.js";
 import { policyEvaluate, policyValidate } from "./commands/policy.js";
 import { analyze } from "./commands/analyze.js";
+import { init } from "./commands/init.js";
 import { runCommand } from "./run.js";
 import { PLANNED, unavailableNotice } from "./planned.js";
 
@@ -68,6 +69,14 @@ for (const command of PLANNED) {
       process.exitCode = exitCode;
     });
 }
+
+program
+  .command("init")
+  .description(`Write a starting ${"proofforge-policy.yml"} into this repository`)
+  .option("--force", "overwrite an existing policy file", false)
+  .action((opts: { force: boolean }) => {
+    process.exitCode = runCommand(() => init({ force: opts.force }));
+  });
 
 program
   .command("analyze")

@@ -20,11 +20,6 @@ export interface PlannedCommand {
 
 export const PLANNED: readonly PlannedCommand[] = [
   {
-    name: "init",
-    description: "Scaffold a proofforge-policy.yml in the current repo",
-    note: "not implemented yet",
-  },
-  {
     name: "run",
     description: "Run an agent task against a repository",
     note: "agents are not wired into the CLI yet",

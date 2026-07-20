@@ -171,7 +171,7 @@ a command whose failure would be misread.
 | `proofforge policy validate <file>` | Validate a policy file | ✅ |
 | `proofforge policy evaluate <policy> <manifest>` | Judge a manifest against a policy | ✅ |
 | `proofforge analyze <path>` | Analyze a repository's structure | ✅ |
-| `proofforge init` | Scaffold a policy file | 🔜 not wired |
+| `proofforge init` | Write a starting policy into the repository | ✅ |
 | `proofforge run --task "..."` | Run an agent task | 🔜 not wired to the CLI |
 
 `analyze` runs the Python analyzer service, so it needs **uv** on the path. The service is
