@@ -1,8 +1,15 @@
+/**
+ * A schema-valid manifest, for tests that need one.
+ *
+ * This lived in three test directories, copied. Every schema change meant
+ * finding all three, and the ones that were missed failed later and elsewhere —
+ * twice in a single afternoon.
+ */
 import { ManifestSchema, computeEvidenceHash, type Manifest } from "@proofforge/evidence-spec";
 
 /** Every collector ran: the default fixture is measured-and-clean, not unmeasured. */
 const COLLECTORS_OK = ["tests", "coverage", "changed-coverage", "secrets", "sast", "vulnerabilities",
-  "sbom", "quality", "performance", "operations"].map((name) => ({
+  "sbom", "complexity", "duplication", "performance", "operations"].map((name) => ({
   name,
   status: "ok" as const,
   detail: "",

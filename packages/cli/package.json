@@ -29,6 +29,7 @@
   "devDependencies": {
     "tsup": "^8.3.5",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "@proofforge/test-fixtures": "workspace:*"
   }
 }

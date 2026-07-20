@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { mapManifestToCheckRun, evaluateManifest } from "../src/checks.js";
 import { renderPullRequestComment } from "../src/comment.js";
-import { buildManifest } from "./fixtures.js";
+import { buildManifest } from "@proofforge/test-fixtures";
 
 const VIOLATION = {
   rule: "security.maxCriticalVulnerabilities",

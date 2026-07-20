@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from doubles import NullToolchain
 from proofforge_evidence.collectors import migrations
-from proofforge_evidence.engine import RawOutput
 
 
 def write(repo: Path, relative: str, text: str) -> None:
@@ -202,33 +202,10 @@ class TestInsideTheEngine:
         )
 
         # tmp_path is not a git repository, so the diff cannot be read.
-        EvidenceEngine(_NullToolchain())._collect_operations(repo, context, evidence)
+        EvidenceEngine(NullToolchain())._collect_operations(repo, context, evidence)
 
         run = next(r for r in evidence.runs if r.name == "operations")
         assert run.status == "unavailable"
         assert "diff" in run.detail
         # And the fields keep their defaults, which the entry now qualifies.
         assert evidence.operations.migrations_detected is False
-
-
-class _NullToolchain:
-    """The operations collector never touches the toolchain."""
-
-    def run_tests(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
-
-    def run_benchmarks(self, repo: Path) -> RawOutput:  # noqa: ARG002
-        """No benchmark suite in these fixtures."""
-        return RawOutput(status="unavailable", detail="no benchmarks")
-
-    def scan_secrets(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
-
-    def scan_sast(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
-
-    def scan_vulnerabilities(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
-
-    def generate_sbom(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")

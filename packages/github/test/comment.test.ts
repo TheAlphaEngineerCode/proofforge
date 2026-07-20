@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderPullRequestComment } from "../src/comment.js";
-import { buildManifest } from "./fixtures.js";
+import { buildManifest } from "@proofforge/test-fixtures";
 
 describe("pull request comment — unmeasured evidence", () => {
   it("does not present an absent test run as a pass", () => {

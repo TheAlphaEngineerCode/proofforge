@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { mapManifestToCheckRun } from "../src/checks.js";
 import { COMMENT_MARKER, renderPullRequestComment } from "../src/comment.js";
 import { inlineText } from "../src/markdown.js";
-import { buildManifest } from "./fixtures.js";
+import { buildManifest } from "@proofforge/test-fixtures";
 
 describe("flattening untrusted text", () => {
   it("keeps ordinary values readable", () => {

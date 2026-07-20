@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluateManifest, mapManifestToCheckRun } from "../src/checks.js";
 import { COMMENT_MARKER, isProofForgeComment, renderPullRequestComment } from "../src/comment.js";
-import { buildManifest } from "./fixtures.js";
+import { buildManifest } from "@proofforge/test-fixtures";
 
 describe("evaluateManifest", () => {
   it("passes clean, low-risk evidence", () => {

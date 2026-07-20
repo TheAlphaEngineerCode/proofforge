@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from pathlib import Path
 
+from doubles import NullToolchain
 from proofforge_evidence.context import ChangeContext, RepositoryRef
 from proofforge_evidence.engine import EvidenceEngine, RawOutput
 from proofforge_evidence.manifest_hash import compute_evidence_hash
@@ -43,24 +44,6 @@ class FakeToolchain:
         return RawOutput(status="ok", text=self._read("syft.json"))
 
 
-class EmptyToolchain:
-    def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
-        return RawOutput(status="unavailable"), RawOutput(status="unavailable")
-
-    def run_benchmarks(self, repo: Path) -> RawOutput:
-        return RawOutput(status="unavailable")
-
-    def scan_secrets(self, repo: Path) -> RawOutput:
-        return RawOutput(status="unavailable")
-
-    def scan_sast(self, repo: Path) -> RawOutput:
-        return RawOutput(status="unavailable")
-
-    def scan_vulnerabilities(self, repo: Path) -> RawOutput:
-        return RawOutput(status="unavailable")
-
-    def generate_sbom(self, repo: Path) -> RawOutput:
-        return RawOutput(status="unavailable")
 
 
 def _context() -> ChangeContext:
@@ -149,7 +132,7 @@ def test_pull_request_omitted_when_absent(tmp_path: Path, read_fixture: Reader) 
 
 
 def test_all_unavailable_still_produces_valid_manifest(tmp_path: Path) -> None:
-    engine = EvidenceEngine(EmptyToolchain())
+    engine = EvidenceEngine(NullToolchain())
     result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
     manifest = result.manifest
     assert compute_evidence_hash(manifest) == manifest["evidenceHash"]
@@ -195,7 +178,7 @@ def test_manifest_records_collector_provenance(tmp_path, read_fixture) -> None:
 
 def test_unmeasured_security_signals_raise_risk(tmp_path) -> None:
     """Silence is not evidence of safety: an absent scanner must cost something."""
-    engine = EvidenceEngine(EmptyToolchain())
+    engine = EvidenceEngine(NullToolchain())
     result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
 
     collectors = result.manifest["collectors"]
@@ -213,7 +196,7 @@ def test_reasons_quote_the_weights_actually_used(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(risk_module, "UNMEASURED_TESTS_PENALTY", 33)
     monkeypatch.setattr(risk_module, "UNMEASURED_PENALTY", 7)
 
-    engine = EvidenceEngine(EmptyToolchain())
+    engine = EvidenceEngine(NullToolchain())
     result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
     reasons = " ".join(result.manifest["risk"]["reasons"])
 
@@ -222,7 +205,7 @@ def test_reasons_quote_the_weights_actually_used(tmp_path, monkeypatch) -> None:
     assert "+20" not in reasons
 
 
-class TestsRanButEmptyToolchain(EmptyToolchain):
+class TestsRanButNullToolchain(NullToolchain):
     """The runner worked; the repository simply has no tests."""
 
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
@@ -232,10 +215,10 @@ class TestsRanButEmptyToolchain(EmptyToolchain):
 
 def test_unrunnable_tests_cost_less_than_a_repo_without_tests(tmp_path) -> None:
     """Our inability to run tests is not a verdict on the repository."""
-    unrunnable = EvidenceEngine(EmptyToolchain()).run(
+    unrunnable = EvidenceEngine(NullToolchain()).run(
         tmp_path / "a", _context(), tmp_path / "bundle-a"
     )
-    no_tests = EvidenceEngine(TestsRanButEmptyToolchain()).run(
+    no_tests = EvidenceEngine(TestsRanButNullToolchain()).run(
         tmp_path / "b", _context(), tmp_path / "bundle-b"
     )
 
@@ -248,7 +231,7 @@ def test_unrunnable_tests_cost_less_than_a_repo_without_tests(tmp_path) -> None:
     assert "found no tests" in no_tests_reasons
 
 
-class TestsWithoutCoverageToolchain(EmptyToolchain):
+class TestsWithoutCoverageToolchain(NullToolchain):
     """Tests run and pass, but no coverage report is produced."""
 
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:

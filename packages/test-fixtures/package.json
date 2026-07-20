@@ -1,0 +1,20 @@
+{
+  "name": "@proofforge/test-fixtures",
+  "version": "0.1.0",
+  "description": "Manifest builders shared by the test suites. Not published.",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@proofforge/evidence-spec": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

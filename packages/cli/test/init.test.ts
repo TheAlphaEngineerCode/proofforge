@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 
 import { POLICY_FILENAME, init } from "../src/commands/init.js";
 import { ExitCode } from "../src/exit-codes.js";
-import { buildManifest } from "./fixtures.js";
+import { buildManifest } from "@proofforge/test-fixtures";
 
 function emptyDir(): string {
   return mkdtempSync(join(tmpdir(), "pf-init-"));

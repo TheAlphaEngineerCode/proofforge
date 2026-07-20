@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
+from doubles import NullToolchain
 from proofforge_evidence.collectors import quality
-from proofforge_evidence.engine import RawOutput
 
 
 def write(repo: Path, relative: str, text: str) -> None:
@@ -152,7 +152,7 @@ class TestInsideTheEngine:
             title="t",
         )
 
-        EvidenceEngine(_NullToolchain())._collect_quality(repo, context, evidence)
+        EvidenceEngine(NullToolchain())._collect_quality(repo, context, evidence)
 
         statuses = {run.name: run.status for run in evidence.runs}
         assert statuses["complexity"] == "unavailable"
@@ -178,7 +178,7 @@ class TestInsideTheEngine:
             branch="main",
             title="t",
         )
-        engine = EvidenceEngine(_NullToolchain())
+        engine = EvidenceEngine(NullToolchain())
 
         import proofforge_evidence.engine as engine_module
 
@@ -192,24 +192,3 @@ class TestInsideTheEngine:
         statuses = {run.name: run.status for run in evidence.runs}
         assert statuses["complexity"] == "unavailable"
         assert statuses["duplication"] == "ok"
-
-
-class _NullToolchain:
-    def run_tests(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
-
-    def run_benchmarks(self, repo: Path) -> RawOutput:  # noqa: ARG002
-        """No benchmark suite in these fixtures."""
-        return RawOutput(status="unavailable", detail="no benchmarks")
-
-    def scan_secrets(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
-
-    def scan_sast(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
-
-    def scan_vulnerabilities(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
-
-    def generate_sbom(self, repo: Path):  # noqa: ANN201, ARG002
-        raise AssertionError("not used")
