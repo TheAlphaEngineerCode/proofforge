@@ -54,7 +54,21 @@ class CollectorRun(BaseModel):
     duration_ms: int = 0
 
 
+class OperationsEvidence(BaseModel):
+    """What the change does to the database, and whether it can be undone.
+
+    The defaults describe a change with no migrations, not a migration judged
+    safe. The collector's provenance entry is what says whether anyone looked.
+    """
+
+    migrations_detected: bool = False
+    migrations_reversible: bool = True
+    rollback_available: bool = True
+    downtime_required: bool = False
+
+
 class ConsolidatedEvidence(BaseModel):
     tests: TestEvidence = Field(default_factory=TestEvidence)
     security: SecurityEvidence = Field(default_factory=SecurityEvidence)
+    operations: OperationsEvidence = Field(default_factory=OperationsEvidence)
     runs: list[CollectorRun] = Field(default_factory=list)

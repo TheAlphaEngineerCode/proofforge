@@ -14,11 +14,11 @@ from typing import Protocol
 
 from pydantic import BaseModel
 
-from proofforge_evidence import changed_coverage
-from proofforge_evidence.collectors import parsers
+from proofforge_evidence import changed_coverage, diff
+from proofforge_evidence.collectors import migrations, parsers
 from proofforge_evidence.context import Artifact, ChangeContext
 from proofforge_evidence.manifest_builder import build_manifest
-from proofforge_evidence.models import CollectorRun, ConsolidatedEvidence
+from proofforge_evidence.models import CollectorRun, ConsolidatedEvidence, OperationsEvidence
 from proofforge_evidence.signing import Signer
 
 
@@ -79,6 +79,7 @@ class EvidenceEngine:
 
         self._collect_tests(repo, context, evidence, artifacts, artifacts_dir)
         self._record_uncollected(evidence)
+        self._collect_operations(repo, context, evidence)
         self._collect_secrets(repo, evidence, artifacts, artifacts_dir)
         self._collect_sast(repo, evidence, artifacts, artifacts_dir)
         self._collect_vulnerabilities(repo, evidence, artifacts, artifacts_dir)
@@ -195,9 +196,41 @@ class EvidenceEngine:
         for name, detail in (
             ("quality", "no complexity or duplication collector exists yet"),
             ("performance", "no benchmark collector exists yet"),
-            ("operations", "no migration or rollback collector exists yet"),
         ):
             evidence.runs.append(CollectorRun(name=name, status="unavailable", detail=detail))
+
+    def _collect_operations(
+        self, repo: Path, context: ChangeContext, evidence: ConsolidatedEvidence
+    ) -> None:
+        """Read the migrations a change touches.
+
+        Needs the diff, so it fails the same way coverage does when the base
+        commit is missing: unavailable, with the reason. Reporting no migrations
+        because the diff could not be read would be the original bug wearing a
+        collector entry.
+        """
+
+        try:
+            changed = diff.changed_lines(repo, context.base_commit, context.commit)
+        except diff.DiffUnavailableError as err:
+            evidence.runs.append(
+                CollectorRun(
+                    name="operations",
+                    status="unavailable",
+                    detail=f"could not read the diff: {err}",
+                )
+            )
+            return
+
+        found = migrations.inspect(repo, sorted(changed))
+        evidence.operations = OperationsEvidence(
+            migrations_detected=found.detected,
+            migrations_reversible=found.reversible,
+            rollback_available=found.rollback_available,
+        )
+        evidence.runs.append(
+            CollectorRun(name="operations", status="ok", detail=found.detail)
+        )
 
     def _collect_secrets(
         self, repo: Path, evidence: ConsolidatedEvidence, artifacts: list[Artifact], out: Path

@@ -32,6 +32,7 @@ def build_manifest(
     """Assemble the manifest dict, stamp its evidence hash and sign it if asked."""
 
     tests = evidence.tests
+    ops = evidence.operations
     sec = evidence.security
     refs = [a.to_ref() for a in artifacts]
 
@@ -95,10 +96,10 @@ def build_manifest(
         },
         "performance": {"benchmarks": []},
         "operations": {
-            "migrationsDetected": False,
-            "migrationsReversible": True,
-            "rollbackAvailable": True,
-            "downtimeRequired": False,
+            "migrationsDetected": ops.migrations_detected,
+            "migrationsReversible": ops.migrations_reversible,
+            "rollbackAvailable": ops.rollback_available,
+            "downtimeRequired": ops.downtime_required,
         },
         "risk": compute_interim_risk(evidence),
         "policies": {"passed": [], "failed": [], "warnings": []},

@@ -184,11 +184,14 @@ and operational evidence to a specific commit, protected by a deterministic SHA-
 `evidenceHash` and an optional ed25519 signature. The schema is the single source of truth
 (Zod → JSON Schema) — see [docs/evidence-spec.md](./docs/evidence-spec.md).
 
-Quality, performance and operational evidence are not collected yet. The fields exist in
-the spec and nothing fills them, so each carries a collector entry marked `unavailable` and
-consumers must not read their defaults as measurements — the operations defaults in
-particular assert safety (`migrationsReversible` and `rollbackAvailable` are true out of the
-box), which is why the verdict and the policy refuse to judge them without that entry.
+Operational evidence is collected: the migrations a change touches are read, and a
+destructive statement with no down migration is reported as irreversible. That is a
+statement about the files, not a promise that running a down migration would restore data.
+
+Quality and performance evidence are not collected yet. The fields exist in the spec and
+nothing fills them, so each carries a collector entry marked `unavailable` — consumers must
+not read their defaults as measurements, and the policy refuses to judge a rule whose
+collector never ran.
 
 ## Roadmap
 
