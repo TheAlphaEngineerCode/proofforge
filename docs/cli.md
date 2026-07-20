@@ -56,12 +56,13 @@ proofforge evidence verify proof-manifest.json --json
 - `--public-key <file>` — PEM or raw base64 ed25519 public key to check the signature.
 - `--require-signature` — fail unless a valid signature is present (unsigned → exit 1).
 
-## Planned commands
+## Declared but unavailable
 
-| Command | Phase |
+| Command | Why |
 | --- | --- |
-| `proofforge analyze <path>` | 2 |
-| `proofforge policy validate <file>` | 6 |
-| `proofforge run --task "..."` | 7 |
+| `proofforge init` | not implemented yet |
+| `proofforge analyze <path>` | the analyzer runs as a service; this command is not wired to it |
+| `proofforge run --task "..."` | agents are not wired into the CLI yet |
 
-These are declared today and print a notice until implemented.
+They appear in `--help`, write the reason to stderr, and **exit 2** — a script
+calling one cannot mistake "did nothing" for "succeeded".
