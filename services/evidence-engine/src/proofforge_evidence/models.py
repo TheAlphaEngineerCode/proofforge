@@ -54,6 +54,15 @@ class CollectorRun(BaseModel):
     duration_ms: int = 0
 
 
+class QualityEvidence(BaseModel):
+    """Complexity and duplication. Their collectors report separately, because
+    one is exact for Python only and the other applies to any text."""
+
+    complexity_before: int = 0
+    complexity_after: int = 0
+    duplicated_lines_percentage: float = 0.0
+
+
 class OperationsEvidence(BaseModel):
     """What the change does to the database, and whether it can be undone.
 
@@ -70,5 +79,6 @@ class OperationsEvidence(BaseModel):
 class ConsolidatedEvidence(BaseModel):
     tests: TestEvidence = Field(default_factory=TestEvidence)
     security: SecurityEvidence = Field(default_factory=SecurityEvidence)
+    quality: QualityEvidence = Field(default_factory=QualityEvidence)
     operations: OperationsEvidence = Field(default_factory=OperationsEvidence)
     runs: list[CollectorRun] = Field(default_factory=list)

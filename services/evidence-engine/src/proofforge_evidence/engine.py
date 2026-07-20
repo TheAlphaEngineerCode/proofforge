@@ -15,7 +15,7 @@ from typing import Protocol
 from pydantic import BaseModel
 
 from proofforge_evidence import changed_coverage, diff
-from proofforge_evidence.collectors import migrations, parsers
+from proofforge_evidence.collectors import migrations, parsers, quality
 from proofforge_evidence.context import Artifact, ChangeContext
 from proofforge_evidence.manifest_builder import build_manifest
 from proofforge_evidence.models import CollectorRun, ConsolidatedEvidence, OperationsEvidence
@@ -80,6 +80,7 @@ class EvidenceEngine:
         self._collect_tests(repo, context, evidence, artifacts, artifacts_dir)
         self._record_uncollected(evidence)
         self._collect_operations(repo, context, evidence)
+        self._collect_quality(repo, context, evidence)
         self._collect_secrets(repo, evidence, artifacts, artifacts_dir)
         self._collect_sast(repo, evidence, artifacts, artifacts_dir)
         self._collect_vulnerabilities(repo, evidence, artifacts, artifacts_dir)
@@ -193,11 +194,59 @@ class EvidenceEngine:
         migrations could never fire.
         """
 
-        for name, detail in (
-            ("quality", "no complexity or duplication collector exists yet"),
-            ("performance", "no benchmark collector exists yet"),
-        ):
-            evidence.runs.append(CollectorRun(name=name, status="unavailable", detail=detail))
+        evidence.runs.append(
+            CollectorRun(
+                name="performance",
+                status="unavailable",
+                detail="no benchmark collector exists yet",
+            )
+        )
+
+    def _collect_quality(
+        self, repo: Path, context: ChangeContext, evidence: ConsolidatedEvidence
+    ) -> None:
+        """Complexity and duplication, reported as two collectors.
+
+        They are separate because their footing differs: complexity is exact and
+        Python-only, duplication is crude and applies to any text. One entry
+        reading `quality: ok` would hide which of the two actually happened.
+        """
+
+        try:
+            changed = sorted(diff.changed_lines(repo, context.base_commit, context.commit))
+        except diff.DiffUnavailableError as err:
+            for name in ("complexity", "duplication"):
+                evidence.runs.append(
+                    CollectorRun(
+                        name=name,
+                        status="unavailable",
+                        detail=f"could not read the diff: {err}",
+                    )
+                )
+            return
+
+        complexity = quality.measure_complexity(repo, changed, context.base_commit)
+        if complexity.measured:
+            evidence.quality.complexity_before = complexity.before
+            evidence.quality.complexity_after = complexity.after
+        evidence.runs.append(
+            CollectorRun(
+                name="complexity",
+                status="ok" if complexity.measured else "unavailable",
+                detail=complexity.detail,
+            )
+        )
+
+        duplication = quality.measure_duplication(repo, changed)
+        if duplication.measured:
+            evidence.quality.duplicated_lines_percentage = duplication.percentage
+        evidence.runs.append(
+            CollectorRun(
+                name="duplication",
+                status="ok" if duplication.measured else "unavailable",
+                detail=duplication.detail,
+            )
+        )
 
     def _collect_operations(
         self, repo: Path, context: ChangeContext, evidence: ConsolidatedEvidence

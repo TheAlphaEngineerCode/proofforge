@@ -33,6 +33,7 @@ def build_manifest(
 
     tests = evidence.tests
     ops = evidence.operations
+    qual = evidence.quality
     sec = evidence.security
     refs = [a.to_ref() for a in artifacts]
 
@@ -87,9 +88,9 @@ def build_manifest(
             ],
         },
         "quality": {
-            "complexityBefore": 0,
-            "complexityAfter": 0,
-            "duplicatedLinesPercentage": 0,
+            "complexityBefore": qual.complexity_before,
+            "complexityAfter": qual.complexity_after,
+            "duplicatedLinesPercentage": qual.duplicated_lines_percentage,
             "newDependencies": [],
             "removedDependencies": [],
             "architectureViolations": [],

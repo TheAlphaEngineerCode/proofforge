@@ -29,7 +29,7 @@ class DiffUnavailableError(Exception):
     """Raised when the changed lines cannot be determined."""
 
 
-def _checked_commit(value: str, label: str) -> str:
+def checked_commit(value: str, label: str) -> str:
     """Reject anything that is not a commit id.
 
     There is no shell here, so this is not about shell injection — it is about
@@ -51,8 +51,8 @@ def changed_lines(repo: Path, base_commit: str, head_commit: str) -> dict[str, s
     rather than substituting a number that measures something else.
     """
 
-    base = _checked_commit(base_commit, "the base commit")
-    head = _checked_commit(head_commit, "the head commit")
+    base = checked_commit(base_commit, "the base commit")
+    head = checked_commit(head_commit, "the head commit")
 
     try:
         result = subprocess.run(

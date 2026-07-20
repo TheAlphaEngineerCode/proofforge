@@ -89,14 +89,17 @@ def test_engine_builds_bundle_and_consolidates_evidence(
         "sast",
         "vulnerabilities",
         "sbom",
-        # Nothing gathers these yet. They carry an entry anyway, because their
-        # defaults would otherwise read as measurements — and the operations
-        # defaults assert safety rather than absence.
-        "quality",
-        "performance",
+        "complexity",
+        "duplication",
         "operations",
+        # Still nobody's job. It carries an entry anyway, because a default of
+        # zero benchmarks would otherwise read as a measurement.
+        "performance",
     }
-    uncollected = {"quality", "performance", "operations"}
+    # The fixture repository is not a git checkout, so everything that needs a
+    # diff reports unavailable — which is the behaviour worth pinning: they say
+    # so rather than reporting zero complexity and no migrations.
+    uncollected = {"performance", "complexity", "duplication", "operations"}
     assert all(
         r.status == "ok" for r in ev.runs if r.name not in uncollected | {"changed-coverage"}
     )
@@ -163,14 +166,17 @@ def test_manifest_records_collector_provenance(tmp_path, read_fixture) -> None:
         "sast",
         "vulnerabilities",
         "sbom",
-        # Nothing gathers these yet. They carry an entry anyway, because their
-        # defaults would otherwise read as measurements — and the operations
-        # defaults assert safety rather than absence.
-        "quality",
-        "performance",
+        "complexity",
+        "duplication",
         "operations",
+        # Still nobody's job. It carries an entry anyway, because a default of
+        # zero benchmarks would otherwise read as a measurement.
+        "performance",
     }
-    uncollected = {"quality", "performance", "operations"}
+    # The fixture repository is not a git checkout, so everything that needs a
+    # diff reports unavailable — which is the behaviour worth pinning: they say
+    # so rather than reporting zero complexity and no migrations.
+    uncollected = {"performance", "complexity", "duplication", "operations"}
     assert all(
         c["status"] == "ok"
         for c in collectors

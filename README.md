@@ -190,10 +190,14 @@ Operational evidence is collected: the migrations a change touches are read, and
 destructive statement with no down migration is reported as irreversible. That is a
 statement about the files, not a promise that running a down migration would restore data.
 
-Quality and performance evidence are not collected yet. The fields exist in the spec and
-nothing fills them, so each carries a collector entry marked `unavailable` — consumers must
-not read their defaults as measurements, and the policy refuses to judge a rule whose
-collector never ran.
+Complexity is measured from Python's own parser and is not attempted for other languages:
+counting braces in TypeScript would produce a number that looks like a measurement. Files it
+cannot parse are named in the collector's detail rather than averaged away. Duplication is
+line-based and applies to any source file — a real signal and a crude one.
+
+Performance evidence is still not collected. The field exists in the spec and nothing fills
+it, so it carries a collector entry marked `unavailable` — consumers must not read its
+default as a measurement, and the policy refuses to judge a rule whose collector never ran.
 
 ## Roadmap
 
