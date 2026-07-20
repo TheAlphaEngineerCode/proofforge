@@ -26,4 +26,10 @@ export {
   type AnthropicProviderOptions,
 } from "./anthropic.js";
 
+export {
+  KNOWN_BASE_URLS,
+  OpenAiCompatibleProvider,
+  type OpenAiCompatibleOptions,
+} from "./openai-compatible.js";
+
 export { FakeProvider, type ScriptedReply } from "./fake.js";
