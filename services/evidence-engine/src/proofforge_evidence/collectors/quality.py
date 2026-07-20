@@ -148,33 +148,43 @@ def measure_duplication(repo: Path, changed_paths: list[str]) -> DuplicationEvid
     if not sources:
         return DuplicationEvidence(measured=False, detail="the change touches no source files")
 
-    windows: dict[tuple[str, ...], int] = {}
-    duplicated_lines = 0
-    total_lines = 0
+    # Where each window occurs, so a repeated one can mark the exact lines it
+    # covers. Counting occurrences instead would overcount badly: windows slide,
+    # so a twelve-line block repeated once produces seven overlapping windows and
+    # would report forty-two duplicated lines out of twelve.
+    occurrences: dict[tuple[str, ...], list[tuple[str, int]]] = {}
+    per_file: dict[str, list[str]] = {}
 
     for relative in sources:
         text = _read(repo / relative)
         if text is None:
             continue
-        lines = [line.strip() for line in text.splitlines()]
-        meaningful = [line for line in lines if line and not _is_noise(line)]
-        total_lines += len(meaningful)
+        meaningful = [
+            stripped
+            for stripped in (line.strip() for line in text.splitlines())
+            if stripped and not _is_noise(stripped)
+        ]
+        per_file[relative] = meaningful
 
         for start in range(len(meaningful) - _WINDOW + 1):
             window = tuple(meaningful[start : start + _WINDOW])
-            windows[window] = windows.get(window, 0) + 1
+            occurrences.setdefault(window, []).append((relative, start))
 
+    total_lines = sum(len(lines) for lines in per_file.values())
     if total_lines == 0:
         return DuplicationEvidence(
             measured=False, detail="the changed files contain no measurable lines"
         )
 
-    for window, count in windows.items():
-        if count > 1:
-            # Every repeat beyond the first is duplicated text.
-            duplicated_lines += len(window) * (count - 1)
+    # A line counts once however many repeated windows cover it.
+    duplicated: set[tuple[str, int]] = set()
+    for window, places in occurrences.items():
+        if len(places) < 2:
+            continue
+        for relative, start in places:
+            duplicated.update((relative, start + offset) for offset in range(len(window)))
 
-    percentage = min(round(duplicated_lines / total_lines * 100, 2), 100.0)
+    percentage = round(len(duplicated) / total_lines * 100, 2)
     return DuplicationEvidence(
         percentage=percentage,
         measured=True,
