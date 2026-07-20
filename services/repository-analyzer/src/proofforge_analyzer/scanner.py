@@ -36,6 +36,18 @@ IGNORED_DIRS = frozenset(
         ".gradle",
         ".idea",
         ".vscode",
+        # Fixture trees are whole miniature projects with their own manifests.
+        # Descending into them made this analyzer report Express, Jest and Redis
+        # for ProofForge itself, none of which it uses — a false positive in a
+        # report that is meant to be evidence. The evidence engine's collectors
+        # already draw the same line.
+        #
+        # Only descent is blocked, so pointing the analyzer straight at a fixture
+        # still works; that is how this project's own tests exercise it.
+        "fixtures",
+        "__fixtures__",
+        "testdata",
+        "test-data",
     }
 )
 

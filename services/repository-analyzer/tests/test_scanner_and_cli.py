@@ -17,6 +17,37 @@ def test_scanner_ignores_vendored_dirs(tmp_path: Path) -> None:
     assert not any(r.startswith("node_modules/") for r in relpaths)
 
 
+def test_scanner_does_not_descend_into_fixture_trees(tmp_path: Path) -> None:
+    """A fixture is a miniature project, and its stack is not the host's.
+
+    Descending made the analyzer report Express and Jest for ProofForge itself,
+    which uses neither -- a false positive in a report meant to be evidence.
+    """
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "app.ts").write_text("export const x = 1;\n", encoding="utf-8")
+    (tmp_path / "tests" / "fixtures" / "node-api").mkdir(parents=True)
+    (tmp_path / "tests" / "fixtures" / "node-api" / "package.json").write_text(
+        '{"dependencies": {"express": "^4"}}\n', encoding="utf-8"
+    )
+
+    relpaths = {f.relpath for f in scan_repository(tmp_path)}
+
+    assert "src/app.ts" in relpaths
+    assert not any("fixtures/" in r for r in relpaths)
+
+
+def test_scanner_still_scans_a_fixture_pointed_at_directly(tmp_path: Path) -> None:
+    """Blocking descent must not make a fixture unanalyzable on purpose.
+
+    The analyzer's own tests work by pointing it straight at one.
+    """
+    root = tmp_path / "fixtures" / "node-api"
+    root.mkdir(parents=True)
+    (root / "index.js").write_text("//\n", encoding="utf-8")
+
+    assert {f.relpath for f in scan_repository(root)} == {"index.js"}
+
+
 def test_empty_repo_reports_no_tests_when_source_present(tmp_path: Path) -> None:
     (tmp_path / "main.py").write_text("print('hi')\n", encoding="utf-8")
     report = analyze_repository(tmp_path)
