@@ -26,6 +26,13 @@ export const KNOWN_BASE_URLS = {
 
 type Fetch = typeof globalThis.fetch;
 
+/**
+ * Ours, so the timeout handler can tell an error we raised from one the network
+ * raised. Without the distinction, a 400 that arrives just as the clock expires
+ * gets reported as a timeout and the actual message is lost.
+ */
+class ProviderError extends Error {}
+
 export interface OpenAiCompatibleOptions {
   /** Root of the API, without a trailing `/chat/completions`. */
   readonly baseUrl: string;
@@ -70,7 +77,10 @@ export class OpenAiCompatibleProvider implements AiProvider {
     this.#apiKey = options.apiKey;
     this.model = options.model;
     this.#timeoutMs = options.timeoutMs ?? 120_000;
-    this.#fetch = options.fetch ?? globalThis.fetch;
+    // Wrapped rather than referenced: `fetch` detached from its global throws
+    // in a browser and in some runtimes, and this package has no reason to
+    // decide it is Node-only.
+    this.#fetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
     this.#now = options.now ?? (() => Date.now());
   }
 
@@ -79,9 +89,9 @@ export class OpenAiCompatibleProvider implements AiProvider {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.#timeoutMs);
 
-    let response: Response;
+    let body: ChatResponse;
     try {
-      response = await this.#fetch(`${this.#baseUrl}/chat/completions`, {
+      const response = await this.#fetch(`${this.#baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -102,10 +112,32 @@ export class OpenAiCompatibleProvider implements AiProvider {
         }),
         signal: controller.signal,
       });
+
+      if (!response.ok) {
+        // The body, not the request: echoing what we sent would put the bearer
+        // token into an error string that gets logged and put in a manifest.
+        throw new ProviderError(
+          `provider returned ${response.status}: ${truncate(await safeText(response))}`,
+        );
+      }
+
+      // Reading the body stays inside the timeout. Headers can arrive promptly
+      // and the body then trickle or stall — clearing the timer any earlier
+      // left exactly the indefinite wait this option exists to prevent.
+      // Not `safeText` here: on the success path a read that fails is the
+      // abort, and swallowing it would report a timeout as malformed JSON.
+      const raw = await response.text();
+      try {
+        body = JSON.parse(raw) as ChatResponse;
+      } catch {
+        // An HTML error page from a proxy, most often. Saying the body was not
+        // JSON beats surfacing a parser's complaint about character 0.
+        throw new ProviderError(`provider did not return JSON: ${truncate(raw)}`);
+      }
     } catch (err) {
-      // An abort is indistinguishable from a network error in the thrown value,
-      // and the difference is the first thing anyone debugging wants to know.
-      if (controller.signal.aborted) {
+      // An abort surfaces as a generic error, and "it timed out" versus "the
+      // network failed" is the first thing anyone debugging wants to know.
+      if (controller.signal.aborted && !(err instanceof ProviderError)) {
         throw new Error(`model did not respond within ${this.#timeoutMs}ms`);
       }
       throw err;
@@ -113,13 +145,6 @@ export class OpenAiCompatibleProvider implements AiProvider {
       clearTimeout(timer);
     }
 
-    if (!response.ok) {
-      // The body, not the request: echoing what we sent would put the bearer
-      // token into an error string that gets logged and put in a manifest.
-      throw new Error(`provider returned ${response.status}: ${truncate(await safeText(response))}`);
-    }
-
-    const body = (await response.json()) as ChatResponse;
     const durationMs = this.#now() - started;
     const choice = body.choices?.[0];
     const model = body.model ?? this.model;

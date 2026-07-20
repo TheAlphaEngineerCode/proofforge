@@ -107,7 +107,9 @@ async function main(): Promise<void> {
       `  cost: ${cost === null ? "unknown (no published rate)" : `$${cost.toFixed(6)}`}\n`,
   );
 
-  const foundInjection = outcome.findings.some((f) => /inject|sql/i.test(f.category + f.summary));
+  const foundInjection = outcome.findings.some((f) =>
+    /inject|sql/i.test(`${f.category} ${f.summary}`),
+  );
   process.stdout.write(
     `\nverdict: ${
       outcome.findings.length === 0

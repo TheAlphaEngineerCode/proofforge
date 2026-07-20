@@ -150,6 +150,43 @@ describe("failures", () => {
     );
   });
 
+  it("says the body was not JSON, rather than blaming character 0", async () => {
+    // A reverse proxy in front of a local model returns HTML on error. The
+    // parser's own complaint tells you nothing about which hop failed.
+    const fetchImpl = vi.fn(
+      async () =>
+        new Response("<html><body>502 Bad Gateway</body></html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+    ) as unknown as typeof globalThis.fetch;
+
+    await expect(provider(fetchImpl).complete(REQUEST)).rejects.toThrow(/did not return JSON/);
+  });
+
+  it("keeps the clock running while the body is still arriving", async () => {
+    // Headers can land immediately and the body then stall. Clearing the timer
+    // once the response object existed left an unbounded wait here.
+    const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
+      const stalled = new ReadableStream({
+        start(controller) {
+          init?.signal?.addEventListener("abort", () => controller.error(new Error("aborted")));
+        },
+      });
+      return new Response(stalled, { status: 200 });
+    }) as unknown as typeof globalThis.fetch;
+
+    const slow = new OpenAiCompatibleProvider({
+      baseUrl: "http://localhost:11434/v1",
+      apiKey: "ignored",
+      model: "qwen2.5-coder",
+      timeoutMs: 20,
+      fetch: fetchImpl,
+    });
+
+    await expect(slow.complete(REQUEST)).rejects.toThrow(/did not respond within 20ms/);
+  });
+
   it("says so when the model does not answer in time", async () => {
     const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
       // What a hung local model looks like: the socket never resolves and the
