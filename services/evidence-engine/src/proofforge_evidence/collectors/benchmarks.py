@@ -36,8 +36,18 @@ class BenchmarkParseError(Exception):
     """Raised when a benchmark report cannot be read."""
 
 
-def parse_pytest_benchmark(json_text: str) -> dict[str, float]:
-    """Mean seconds per benchmark, keyed by name, from pytest-benchmark JSON."""
+@dataclass(frozen=True)
+class Timing:
+    """A benchmark's mean, and how much it varied while being measured."""
+
+    mean_s: float
+    #: Standard deviation across rounds. Zero when the report omits it, which
+    #: makes the noise check fall back to reporting the difference as given.
+    stddev_s: float = 0.0
+
+
+def parse_pytest_benchmark(json_text: str) -> dict[str, Timing]:
+    """Timings per benchmark, keyed by name, from pytest-benchmark JSON."""
 
     try:
         data = json.loads(json_text)
@@ -51,7 +61,7 @@ def parse_pytest_benchmark(json_text: str) -> dict[str, float]:
     if not isinstance(entries, list):
         raise BenchmarkParseError("benchmark report has no benchmarks array")
 
-    means: dict[str, float] = {}
+    timings: dict[str, Timing] = {}
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -60,12 +70,17 @@ def parse_pytest_benchmark(json_text: str) -> dict[str, float]:
         if not isinstance(name, str) or not isinstance(stats, dict):
             continue
         mean = stats.get("mean")
-        if isinstance(mean, (int, float)):
-            means[name] = float(mean)
-    return means
+        if not isinstance(mean, (int, float)):
+            continue
+        stddev = stats.get("stddev")
+        timings[name] = Timing(
+            mean_s=float(mean),
+            stddev_s=float(stddev) if isinstance(stddev, (int, float)) else 0.0,
+        )
+    return timings
 
 
-def compare(baseline: dict[str, float], candidate: dict[str, float]) -> BenchmarkEvidence:
+def compare(baseline: dict[str, Timing], candidate: dict[str, Timing]) -> BenchmarkEvidence:
     """Match benchmarks by name and report how each moved.
 
     A benchmark that exists on only one side is left out rather than compared
@@ -84,30 +99,50 @@ def compare(baseline: dict[str, float], candidate: dict[str, float]) -> Benchmar
         return BenchmarkEvidence(measured=False, detail=reason)
 
     results: list[Benchmark] = []
+    zero_baseline = 0
+    within_noise = 0
+
     for name in shared:
         before = baseline[name]
         after = candidate[name]
-        # A baseline of zero cannot produce a percentage. Reporting one would be
-        # dividing by a number nobody measured properly.
-        if before <= 0:
+        # A baseline of zero cannot produce a percentage. Dividing by it would
+        # be dividing by a number nobody measured properly.
+        if before.mean_s <= 0:
+            zero_baseline += 1
             continue
+
+        difference = after.mean_s - before.mean_s
+        if abs(difference) <= before.stddev_s + after.stddev_s:
+            # The two runs happened in separate containers, so some of the gap
+            # is the machine rather than the change. Counting it keeps the
+            # detail honest about how many figures sit inside that variation.
+            within_noise += 1
+
         results.append(
             Benchmark(
                 name=name,
-                baseline_ms=round(before * 1000, 4),
-                candidate_ms=round(after * 1000, 4),
-                regression_percentage=round((after - before) / before * 100, 2),
+                baseline_ms=round(before.mean_s * 1000, 4),
+                candidate_ms=round(after.mean_s * 1000, 4),
+                regression_percentage=round(difference / before.mean_s * 100, 2),
             )
         )
 
     if not results:
         return BenchmarkEvidence(
-            measured=False, detail="every shared benchmark reported a zero baseline"
+            measured=False,
+            detail=f"{zero_baseline} shared benchmark(s) reported a zero baseline",
         )
 
     only_new = len(set(candidate) - set(baseline))
     only_old = len(set(baseline) - set(candidate))
+
     detail = f"{len(results)} benchmark(s) compared"
+    if within_noise:
+        # Said plainly, because a percentage carries no indication of its own
+        # footing and a reviewer would otherwise read 3% as a finding.
+        detail += f"; {within_noise} within run-to-run variation"
+    if zero_baseline:
+        detail += f"; {zero_baseline} skipped for a zero baseline"
     if only_new:
         detail += f"; {only_new} new benchmark(s) had no baseline"
     if only_old:
@@ -116,7 +151,7 @@ def compare(baseline: dict[str, float], candidate: dict[str, float]) -> Benchmar
     return BenchmarkEvidence(benchmarks=results, measured=True, detail=detail)
 
 
-def read_report(path: Path) -> dict[str, float] | None:
+def read_report(path: Path) -> dict[str, Timing] | None:
     """Read a report the sandbox wrote, or None when the run produced none."""
 
     try:

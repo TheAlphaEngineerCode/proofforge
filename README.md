@@ -200,6 +200,12 @@ the sandbox on the change and again on a throwaway checkout of the base commit. 
 pytest-benchmark is read, and a benchmark present on one side only is left out rather than
 compared against nothing — the manifest has no way to say "new, no baseline".
 
+The two runs happen in separate containers, so part of any difference is the machine. When
+a figure falls inside the run-to-run variation the collector says so, because a percentage
+carries no indication of its own footing and a reviewer would otherwise read 3% as a
+finding. Short benchmarks are frequently flagged this way; that is the measurement being
+honest about itself rather than a fault.
+
 ## Roadmap
 
 Foundation and the Evidence Spec ship first; AI agents come last, on top of a base that can
