@@ -114,6 +114,24 @@ node packages/cli/dist/index.js evidence verify ./bundle/proof-manifest.json
 node packages/cli/dist/index.js policy evaluate policies/default.yml ./bundle/proof-manifest.json
 ```
 
+### Run the storage tests against PostgreSQL
+
+Most tests use the in-memory backend. The Drizzle backend is exercised separately,
+because a column constraint or a JSON round-trip is decided by the database, not by
+the type checker:
+
+```bash
+docker run -d --name pf-pg-test -e POSTGRES_PASSWORD=proofforge \
+  -e POSTGRES_DB=proofforge -p 55432:5432 postgres:16-alpine
+docker exec -i pf-pg-test psql -U postgres -d proofforge \
+  < packages/database/migrations/0000_fine_morbius.sql
+
+TEST_DATABASE_URL=postgresql://postgres:proofforge@localhost:55432/proofforge \
+  pnpm --filter @proofforge/database test
+```
+
+Without `TEST_DATABASE_URL` those tests skip, so the ordinary suite needs no database.
+
 ## Test execution
 
 Tests run in a per-stack container. Only frameworks whose JUnit reporters are built in are

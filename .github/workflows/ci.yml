@@ -51,6 +51,54 @@ jobs:
           pnpm --filter @proofforge/evidence-spec generate:schema
           git diff --exit-code -- packages/evidence-spec/schema/proof-manifest.schema.json
 
+  postgres:
+    name: Storage · PostgreSQL integration
+    runs-on: ubuntu-latest
+    # The in-memory backend is what every other job exercises. This one runs the
+    # Drizzle backend against a real database, where column constraints, JSON
+    # round-trips and timestamp formats are decided rather than assumed.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: proofforge
+          POSTGRES_DB: proofforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply the schema
+        env:
+          PGPASSWORD: proofforge
+        run: |
+          psql -h localhost -U postgres -d proofforge \
+            -f packages/database/migrations/0000_fine_morbius.sql
+
+      - name: Run the storage tests against PostgreSQL
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:proofforge@localhost:5432/proofforge
+        run: pnpm --filter @proofforge/database test
+
   python:
     name: Python services · Ruff · mypy · pytest
     runs-on: ubuntu-latest
