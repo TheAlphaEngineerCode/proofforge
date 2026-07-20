@@ -45,6 +45,14 @@ const REQUIRES: Record<string, string> = {
   // be read. Pointing this rule at the whole-repository collector would let it
   // pass on a figure that describes code the change never touched.
   "tests.minChangedLinesCoverage": "changed-coverage",
+  // The operations defaults assert safety rather than absence:
+  // migrationsReversible and rollbackAvailable are true out of the box. Without
+  // this, a rule guarding against irreversible migrations passed on a manifest
+  // where nothing had looked for one, which is worse than the rule not existing
+  // — it reads as a guarantee.
+  "operations.reversibleMigrationsRequired": "operations",
+  "operations.downtimeAllowed": "operations",
+  "operations.rollbackRequired": "operations",
 };
 
 export function evaluatePolicy(policy: Policy, manifest: Manifest): PolicyReport {

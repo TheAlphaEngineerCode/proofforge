@@ -6,7 +6,7 @@
  */
 import type { Manifest } from "@proofforge/evidence-spec";
 import { inlineText } from "./markdown.js";
-import { measured } from "./provenance.js";
+import { collectorRan, measured } from "./provenance.js";
 
 export type CheckConclusion = "success" | "failure" | "neutral";
 
@@ -43,7 +43,14 @@ export function evaluateManifest(manifest: Manifest): Verdict {
   for (const violation of manifest.policies.failed) {
     blocking.push(`policy ${inlineText(violation.rule)}`);
   }
-  if (manifest.operations.migrationsDetected && !manifest.operations.migrationsReversible) {
+  // Only when someone looked. The operations fields default to "safe" —
+  // migrationsDetected false, migrationsReversible true — so reading them
+  // without provenance turns "nobody checked" into "checked and fine".
+  if (
+    collectorRan(manifest, "operations") &&
+    manifest.operations.migrationsDetected &&
+    !manifest.operations.migrationsReversible
+  ) {
     blocking.push("irreversible migration");
   }
 

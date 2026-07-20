@@ -1,7 +1,8 @@
 import { ManifestSchema, computeEvidenceHash, type Manifest } from "@proofforge/evidence-spec";
 
 /** Every collector ran: the default fixture is measured-and-clean, not unmeasured. */
-const COLLECTORS_OK = ["tests", "coverage", "secrets", "sast", "vulnerabilities", "sbom"].map((name) => ({
+const COLLECTORS_OK = ["tests", "coverage", "changed-coverage", "secrets", "sast", "vulnerabilities",
+  "sbom", "quality", "performance", "operations"].map((name) => ({
   name,
   status: "ok" as const,
   detail: "",

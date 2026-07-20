@@ -68,14 +68,20 @@ export function renderPullRequestComment(manifest: Manifest): string {
     lines.push(worstBenchmark.regressionPercentage <= 5 ? pass(text) : warn(text));
   }
 
-  if (operations.migrationsDetected) {
-    lines.push(
-      operations.migrationsReversible
-        ? pass("Migration reversible")
-        : fail("Irreversible migration"),
-    );
+  // Same reason as the check run: these fields default to a safe answer, so
+  // reporting them without provenance turns silence into reassurance.
+  if (!ran("operations")) {
+    lines.push(warn("Migrations and rollback were not checked - unverified"));
+  } else {
+    if (operations.migrationsDetected) {
+      lines.push(
+        operations.migrationsReversible
+          ? pass("Migration reversible")
+          : fail("Irreversible migration"),
+      );
+    }
+    if (operations.downtimeRequired) lines.push(warn("Deployment requires downtime"));
   }
-  if (operations.downtimeRequired) lines.push(warn("Deployment requires downtime"));
 
   for (const dependency of quality.newDependencies) {
     // A dependency is an object, and interpolating it rendered "[object Object]"

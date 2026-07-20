@@ -78,6 +78,7 @@ class EvidenceEngine:
         artifacts: list[Artifact] = []
 
         self._collect_tests(repo, context, evidence, artifacts, artifacts_dir)
+        self._record_uncollected(evidence)
         self._collect_secrets(repo, evidence, artifacts, artifacts_dir)
         self._collect_sast(repo, evidence, artifacts, artifacts_dir)
         self._collect_vulnerabilities(repo, evidence, artifacts, artifacts_dir)
@@ -178,6 +179,25 @@ class EvidenceEngine:
                 or f"{result.covered_lines}/{result.measured_lines} added lines covered",
             )
         )
+
+    def _record_uncollected(self, evidence: ConsolidatedEvidence) -> None:
+        """Declare the evidence nobody gathers yet.
+
+        The manifest has fields for quality, performance and operations, and
+        without a collector saying so their defaults read as measurements. The
+        operations defaults are the dangerous ones: `migrationsReversible` and
+        `rollbackAvailable` default to true, so a manifest asserted that
+        migrations were safe when nothing had looked. The verdict consumes those
+        fields, which meant a rule that appeared to guard against irreversible
+        migrations could never fire.
+        """
+
+        for name, detail in (
+            ("quality", "no complexity or duplication collector exists yet"),
+            ("performance", "no benchmark collector exists yet"),
+            ("operations", "no migration or rollback collector exists yet"),
+        ):
+            evidence.runs.append(CollectorRun(name=name, status="unavailable", detail=detail))
 
     def _collect_secrets(
         self, repo: Path, evidence: ConsolidatedEvidence, artifacts: list[Artifact], out: Path

@@ -106,3 +106,56 @@ describe("the check run does not present unmeasured evidence as clean", () => {
     expect(summary).toMatch(/Secrets: 0 detected/);
   });
 });
+
+
+describe("operations evidence nobody gathered", () => {
+  const NO_OPERATIONS_COLLECTOR = [
+    { name: "tests", status: "ok" as const, detail: "", durationMs: 10 },
+  ];
+
+  it("does not report migrations as safe when nothing looked", () => {
+    // The defaults assert safety: migrationsDetected false, migrationsReversible
+    // true. Reading them without provenance turns silence into reassurance.
+    const manifest = buildManifest({ collectors: NO_OPERATIONS_COLLECTOR });
+
+    const body = renderPullRequestComment(manifest);
+
+    expect(body).toMatch(/Migrations and rollback were not checked/);
+    expect(body).not.toMatch(/Migration reversible/);
+  });
+
+  it("cannot block on an irreversible migration it never detected", () => {
+    // The rule exists and looks like it guards this. Without a collector it can
+    // never fire, so the guarantee it implies is not one.
+    const manifest = buildManifest({
+      collectors: NO_OPERATIONS_COLLECTOR,
+      operations: {
+        migrationsDetected: false,
+        migrationsReversible: true,
+        rollbackAvailable: true,
+        downtimeRequired: false,
+      },
+    });
+
+    expect(evaluateManifest(manifest).blocking).not.toContain("irreversible migration");
+    // ...and the comment says why, rather than implying it was checked.
+    expect(renderPullRequestComment(manifest)).toContain("not checked");
+  });
+
+  it("still blocks when a collector did look and found one", () => {
+    const manifest = buildManifest({
+      collectors: [
+        ...NO_OPERATIONS_COLLECTOR,
+        { name: "operations", status: "ok" as const, detail: "", durationMs: 5 },
+      ],
+      operations: {
+        migrationsDetected: true,
+        migrationsReversible: false,
+        rollbackAvailable: false,
+        downtimeRequired: false,
+      },
+    });
+
+    expect(evaluateManifest(manifest).blocking).toContain("irreversible migration");
+  });
+});

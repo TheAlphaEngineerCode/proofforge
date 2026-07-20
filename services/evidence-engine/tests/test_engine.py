@@ -89,8 +89,18 @@ def test_engine_builds_bundle_and_consolidates_evidence(
         "sast",
         "vulnerabilities",
         "sbom",
+        # Nothing gathers these yet. They carry an entry anyway, because their
+        # defaults would otherwise read as measurements — and the operations
+        # defaults assert safety rather than absence.
+        "quality",
+        "performance",
+        "operations",
     }
-    assert all(r.status == "ok" for r in ev.runs if r.name != "changed-coverage")
+    uncollected = {"quality", "performance", "operations"}
+    assert all(
+        r.status == "ok" for r in ev.runs if r.name not in uncollected | {"changed-coverage"}
+    )
+    assert all(r.status == "unavailable" for r in ev.runs if r.name in uncollected)
 
 
 def test_manifest_is_schema_shaped_and_self_consistent(
@@ -153,8 +163,21 @@ def test_manifest_records_collector_provenance(tmp_path, read_fixture) -> None:
         "sast",
         "vulnerabilities",
         "sbom",
+        # Nothing gathers these yet. They carry an entry anyway, because their
+        # defaults would otherwise read as measurements — and the operations
+        # defaults assert safety rather than absence.
+        "quality",
+        "performance",
+        "operations",
     }
-    assert all(c["status"] == "ok" for c in collectors if c["name"] != "changed-coverage")
+    uncollected = {"quality", "performance", "operations"}
+    assert all(
+        c["status"] == "ok"
+        for c in collectors
+        if c["name"] not in uncollected | {"changed-coverage"}
+    )
+    # The manifest must say who did not measure, not just who did.
+    assert all(c["status"] == "unavailable" for c in collectors if c["name"] in uncollected)
 
 
 def test_unmeasured_security_signals_raise_risk(tmp_path) -> None:
