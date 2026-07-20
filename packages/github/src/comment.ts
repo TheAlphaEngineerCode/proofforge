@@ -6,6 +6,7 @@
  */
 import type { Manifest } from "@proofforge/evidence-spec";
 import { evaluateManifest } from "./checks.js";
+import { inlineText } from "./markdown.js";
 
 export const COMMENT_MARKER = "<!-- proofforge:verification -->";
 
@@ -63,7 +64,7 @@ export function renderPullRequestComment(manifest: Manifest): string {
     (a, b) => b.regressionPercentage - a.regressionPercentage,
   )[0];
   if (worstBenchmark) {
-    const text = `${worstBenchmark.name}: ${worstBenchmark.regressionPercentage}% latency change`;
+    const text = `${inlineText(worstBenchmark.name)}: ${worstBenchmark.regressionPercentage}% latency change`;
     lines.push(worstBenchmark.regressionPercentage <= 5 ? pass(text) : warn(text));
   }
 
@@ -77,7 +78,14 @@ export function renderPullRequestComment(manifest: Manifest): string {
   if (operations.downtimeRequired) lines.push(warn("Deployment requires downtime"));
 
   for (const dependency of quality.newDependencies) {
-    lines.push(warn(`New dependency added: ${dependency}`));
+    // A dependency is an object, and interpolating it rendered "[object Object]"
+    // in every comment that reported one. Nothing complained: a template literal
+    // takes any type, and the surrounding text still read as a sentence.
+    lines.push(
+      warn(
+        `New dependency added: \`${inlineText(dependency.name)}@${inlineText(dependency.version)}\``,
+      ),
+    );
   }
   if (quality.architectureViolations.length > 0) {
     lines.push(warn(`${quality.architectureViolations.length} architecture violation(s)`));
@@ -88,10 +96,10 @@ export function renderPullRequestComment(manifest: Manifest): string {
   // rule to fix.
   const policyLines: string[] = [];
   for (const violation of manifest.policies.failed) {
-    policyLines.push(fail(`\`${violation.rule}\` — ${violation.message}`));
+    policyLines.push(fail(`\`${inlineText(violation.rule)}\` — ${inlineText(violation.message)}`));
   }
   for (const warning of manifest.policies.warnings) {
-    policyLines.push(warn(`\`${warning.rule}\` — ${warning.message}`));
+    policyLines.push(warn(`\`${inlineText(warning.rule)}\` — ${inlineText(warning.message)}`));
   }
 
   const policySection =

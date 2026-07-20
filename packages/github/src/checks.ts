@@ -5,6 +5,7 @@
  * model's opinion — so the same evidence always yields the same conclusion.
  */
 import type { Manifest } from "@proofforge/evidence-spec";
+import { inlineText } from "./markdown.js";
 import { measured } from "./provenance.js";
 
 export type CheckConclusion = "success" | "failure" | "neutral";
@@ -40,7 +41,7 @@ export function evaluateManifest(manifest: Manifest): Verdict {
   // Name the rules. A count tells a reviewer that something is wrong without
   // telling them what to fix, and the rule name is the only part they can act on.
   for (const violation of manifest.policies.failed) {
-    blocking.push(`policy ${violation.rule}`);
+    blocking.push(`policy ${inlineText(violation.rule)}`);
   }
   if (manifest.operations.migrationsDetected && !manifest.operations.migrationsReversible) {
     blocking.push("irreversible migration");
@@ -75,7 +76,7 @@ export function mapManifestToCheckRun(manifest: Manifest): CheckRunResult {
   if (policies.failed.length > 0) {
     lines.push("", "**Policy violations**");
     for (const violation of policies.failed) {
-      lines.push(`- \`${violation.rule}\` — ${violation.message}`);
+      lines.push(`- \`${inlineText(violation.rule)}\` — ${inlineText(violation.message)}`);
     }
   }
 
@@ -84,7 +85,7 @@ export function mapManifestToCheckRun(manifest: Manifest): CheckRunResult {
   if (policies.warnings.length > 0) {
     lines.push("", "**Policy warnings**");
     for (const warning of policies.warnings) {
-      lines.push(`- \`${warning.rule}\` — ${warning.message}`);
+      lines.push(`- \`${inlineText(warning.rule)}\` — ${inlineText(warning.message)}`);
     }
   }
 
