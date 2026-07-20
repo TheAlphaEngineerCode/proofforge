@@ -21,8 +21,10 @@ import type { Database } from "./client.js";
 import * as schema from "./schema.js";
 import type {
   AnalysisUpdate,
+  AuditLog,
   Installation,
   NewAnalysis,
+  NewAuditLog,
   NewEvidenceBundle,
   NewInstallation,
   NewOrganization,
@@ -385,4 +387,33 @@ export class DrizzleStorage implements Storage {
       .delete(schema.installations)
       .where(eq(schema.installations.githubInstallationId, githubInstallationId));
   }
+
+  async recordAuditLog(input: NewAuditLog): Promise<AuditLog> {
+    const rows = await this.db.insert(schema.auditLogs).values(input).returning();
+    return toAuditLog(first(rows));
+  }
+
+  async listAuditLogs(organizationId: string): Promise<AuditLog[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.auditLogs)
+      .where(eq(schema.auditLogs.organizationId, organizationId))
+      .orderBy(desc(schema.auditLogs.createdAt));
+    return rows.map(toAuditLog);
+  }
+}
+
+function toAuditLog(row: typeof schema.auditLogs.$inferSelect): AuditLog {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    actorType: row.actorType,
+    actorId: row.actorId,
+    action: row.action,
+    targetType: row.targetType,
+    targetId: row.targetId,
+    // jsonb comes back as unknown; the column only ever receives an object.
+    metadata: (row.metadata as Record<string, unknown> | null) ?? null,
+    createdAt: row.createdAt.toISOString(),
+  };
 }

@@ -71,7 +71,56 @@ export class PolicyGate {
     };
     manifest.evidenceHash = computeEvidenceHash(manifest);
 
+    await this.recordWaivers(organizationId, manifest, report);
+
     return { report, finalStatus: STATUS_FOR[report.decision] };
+  }
+
+  /**
+   * Write one audit entry per waived rule.
+   *
+   * The waiver is already in the manifest, but a manifest covers one change. It
+   * cannot answer "who keeps waiving this rule, and how often" — and a rule
+   * waived every time is a rule nobody is enforcing. That question needs a log
+   * that outlives the change.
+   *
+   * Failing to write the log must not change the verdict: the analysis is
+   * finished and correct either way, so this is reported and swallowed.
+   */
+  private async recordWaivers(
+    organizationId: string,
+    manifest: Manifest,
+    report: PolicyReport,
+  ): Promise<void> {
+    const waived = [...report.passed, ...report.warnings].filter(
+      (outcome) => outcome.waivedBy !== undefined,
+    );
+
+    for (const outcome of waived) {
+      try {
+        await this.storage.recordAuditLog({
+          organizationId,
+          // The approver is named in the policy file, not authenticated here, so
+          // this records who the policy says accepted it — not a verified actor.
+          actorType: "policy_exception",
+          actorId: outcome.waivedBy ?? null,
+          action: "policy.rule_waived",
+          targetType: "analysis",
+          targetId: manifest.id,
+          metadata: {
+            rule: outcome.rule,
+            severity: outcome.severity,
+            message: outcome.message,
+            commit: manifest.change.commit,
+            evidenceHash: manifest.evidenceHash,
+          },
+        });
+      } catch (err) {
+        this.logger.warn(
+          `[policy] could not record the waiver of ${outcome.rule}: ${String(err)}`,
+        );
+      }
+    }
   }
 
   private async activePolicy(organizationId: string): Promise<string | null> {

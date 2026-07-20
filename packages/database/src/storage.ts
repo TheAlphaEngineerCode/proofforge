@@ -88,6 +88,37 @@ export interface NewInstallation {
   suspended?: boolean;
 }
 
+/**
+ * A decision worth answering for later.
+ *
+ * The case this exists for is a policy exception: a rule that would have blocked
+ * a change, waived because someone accepted the risk. The waiver already reaches
+ * the manifest, but a manifest is per-change — it cannot answer "who has been
+ * waiving this rule, and how often". That question is the point of an audit log.
+ */
+export interface AuditLog {
+  id: string;
+  organizationId: string | null;
+  /** "user" for a person, "system" for the platform acting on its own. */
+  actorType: string;
+  actorId: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface NewAuditLog {
+  organizationId?: string | null;
+  actorType: string;
+  actorId?: string | null;
+  action: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
 export interface Storage {
   createUser(input: NewUser): Promise<User>;
   getUser(id: string): Promise<User | null>;
@@ -122,4 +153,8 @@ export interface Storage {
   createPolicy(input: NewPolicy): Promise<Policy>;
   listPolicies(organizationId: string): Promise<Policy[]>;
   getPolicy(id: string): Promise<Policy | null>;
+
+  recordAuditLog(input: NewAuditLog): Promise<AuditLog>;
+  /** Newest first. */
+  listAuditLogs(organizationId: string): Promise<AuditLog[]>;
 }

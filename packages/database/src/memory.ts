@@ -17,8 +17,10 @@ import type {
 } from "@proofforge/shared-types";
 import type {
   AnalysisUpdate,
+  AuditLog,
   Installation,
   NewAnalysis,
+  NewAuditLog,
   NewEvidenceBundle,
   NewInstallation,
   NewOrganization,
@@ -41,6 +43,8 @@ export class InMemoryStorage implements Storage {
   private readonly manifests = new Map<string, unknown>();
   private readonly policies = new Map<string, Policy>();
   private readonly installations = new Map<number, Installation>();
+  /** Append-only: an audit trail that can be edited is not one. */
+  private readonly auditLogs: AuditLog[] = [];
 
   private now(): string {
     return new Date().toISOString();
@@ -241,5 +245,27 @@ export class InMemoryStorage implements Storage {
 
   async getPolicy(id: string): Promise<Policy | null> {
     return this.policies.get(id) ?? null;
+  }
+
+  async recordAuditLog(input: NewAuditLog): Promise<AuditLog> {
+    const entry: AuditLog = {
+      id: randomUUID(),
+      organizationId: input.organizationId ?? null,
+      actorType: input.actorType,
+      actorId: input.actorId ?? null,
+      action: input.action,
+      targetType: input.targetType ?? null,
+      targetId: input.targetId ?? null,
+      metadata: input.metadata ?? null,
+      createdAt: this.now(),
+    };
+    this.auditLogs.push(entry);
+    return entry;
+  }
+
+  async listAuditLogs(organizationId: string): Promise<AuditLog[]> {
+    return this.auditLogs
+      .filter((entry) => entry.organizationId === organizationId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 }
