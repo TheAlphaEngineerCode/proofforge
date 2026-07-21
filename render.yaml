@@ -28,11 +28,12 @@ services:
         fromDatabase:
           name: proofforge-postgres
           property: connectionString
+      # Set by hand, with the scheme. `fromService` can only yield a bare host
+      # (`proofforge-web.onrender.com`), and this value is compared against the
+      # browser's Origin header for CORS — an origin without https:// never
+      # matches, so every dashboard request would be blocked.
       - key: WEB_BASE_URL
-        fromService:
-          name: proofforge-web
-          type: web
-          property: host
+        sync: false
       # Absent until the GitHub App is registered; the API runs without it and
       # records webhook state instead of publishing.
       - key: GITHUB_APP_ID
@@ -49,13 +50,11 @@ services:
     dockerContext: .
     plan: starter
     envVars:
-      # Baked into the client bundle at build time, so a change here means a
-      # rebuild rather than a restart.
+      # Same reason, and one more: this is baked into the client bundle at
+      # build time, so it must be a full URL the browser can fetch, and a
+      # change means a rebuild rather than a restart.
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          name: proofforge-api
-          type: web
-          property: host
+        sync: false
 
 databases:
   - name: proofforge-postgres

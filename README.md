@@ -176,7 +176,9 @@ is persisted across a restart.
 pointing it at a different API means rebuilding the image, not restarting the container.
 
 [`render.yaml`](./render.yaml) is a Render blueprint for both services plus PostgreSQL.
-Unlike the Dockerfiles, it has not been deployed — treat the first deploy as its test.
+Unlike the Dockerfiles, it has never been deployed — treat the first deploy as its test.
+`WEB_BASE_URL` and `NEXT_PUBLIC_API_URL` are prompted for rather than wired between services,
+because Render can only supply a bare hostname and both values need the scheme.
 
 ## Test execution
 

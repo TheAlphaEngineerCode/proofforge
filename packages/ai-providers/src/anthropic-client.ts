@@ -47,9 +47,12 @@ export function createAnthropicProvider(options: LiveAnthropicOptions = {}): Ant
   });
 
   return new AnthropicProvider({
-    // The SDK satisfies the port structurally; the port stays narrow so the
-    // tests exercise our translation of a reply rather than a reimplementation
-    // of the SDK.
+    // The cast is deliberate and the compiler is right to want it: the port
+    // declares `stream(params: Record<string, unknown>)` while the SDK requires
+    // model, max_tokens and messages, and a function accepting less cannot
+    // stand in for one accepting more. The reply shapes do match, and the port
+    // stays loose so the tests exercise our translation of a reply rather than
+    // a reimplementation of the SDK's request types.
     client: client as unknown as AnthropicClientPort,
     model: options.model ?? DEFAULT_MODEL,
   });
