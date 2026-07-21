@@ -8,7 +8,7 @@ _Engenharia de software autônoma com mudanças verificáveis_
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Spec: proof-manifest 1.1.0](https://img.shields.io/badge/proof--manifest-1.1.0-8A2BE2.svg)](./docs/evidence-spec.md)
-[![Status: Phases 0–7](https://img.shields.io/badge/status-phases_0--7-brightgreen.svg)](./ROADMAP.md)
+[![Status: Phases 0–7 + observability](https://img.shields.io/badge/status-phases_0--7_%2B_observability-brightgreen.svg)](./ROADMAP.md)
 
 </div>
 
@@ -150,6 +150,34 @@ TEST_DATABASE_URL=postgresql://postgres:proofforge@localhost:55432/proofforge \
 
 Without `TEST_DATABASE_URL` those tests skip, so the ordinary suite needs no database.
 
+## Running it in containers
+
+Both images build from the **repository root**, not from their own directory — each app
+depends on workspace packages that a narrower context could not see.
+
+```bash
+docker build -f apps/api/Dockerfile -t proofforge-api .
+docker run -p 3001:3001 proofforge-api
+
+docker build -f apps/web/Dockerfile -t proofforge-web .
+docker run -p 3000:3000 proofforge-web
+```
+
+Both run as an unprivileged user (uid 10001, the same one the evidence sandbox uses) and
+carry a `HEALTHCHECK`, so an orchestrator restarts a wedged process instead of leaving it
+in the load balancer answering nothing.
+
+The API image sets `NODE_ENV=production`, which disables the credential-free dev login
+regardless of `AUTH_DEV_LOGIN` — the route returns 404 rather than existing and refusing.
+Without `DATABASE_URL` it falls back to in-memory storage and says so in the logs; nothing
+is persisted across a restart.
+
+`NEXT_PUBLIC_API_URL` is read by the dashboard's client bundle at **build** time, so
+pointing it at a different API means rebuilding the image, not restarting the container.
+
+[`render.yaml`](./render.yaml) is a Render blueprint for both services plus PostgreSQL.
+Unlike the Dockerfiles, it has not been deployed — treat the first deploy as its test.
+
 ## Test execution
 
 Tests run in a per-stack container. Only frameworks whose JUnit reporters are built in are
@@ -219,6 +247,7 @@ already prove things. Full plan in [ROADMAP.md](./ROADMAP.md).
 - **Phase 5** — GitHub App ✅
 - **Phase 6** — Risk & Policy engines ✅
 - **Phase 7** — AI agents (provider-neutral) ✅
+- **Observability** — structured logs, metrics at `/metrics` ✅
 - **Phase 8** — Distributed workers
 - **Phase 9** — SDK & plugins
 

@@ -1,0 +1,21 @@
+# Everything the build produces or the host leaves behind. Keeping these out of
+# the context makes the build faster and stops a local .env from being copied
+# into an image.
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+.turbo
+**/.turbo
+coverage
+**/coverage
+.venv
+**/.venv
+__pycache__
+**/__pycache__
+.git
+.env
+.env.*
+*.log

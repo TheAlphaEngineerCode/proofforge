@@ -1,0 +1,63 @@
+# Render blueprint.
+#
+# Unlike the Dockerfiles, this file has not been deployed — it is a starting
+# point written against Render's blueprint spec, not something proven to boot.
+# Treat the first deploy as the test.
+#
+# Secrets are declared with `sync: false` so Render prompts for them rather than
+# reading them from this file; nothing here should ever hold a credential.
+
+services:
+  - type: web
+    name: proofforge-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    # The API depends on eight workspace packages, so the build context has to
+    # be the repository root — the same reason the Dockerfiles say so.
+    dockerContext: .
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: API_PORT
+        value: "3001"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: proofforge-postgres
+          property: connectionString
+      - key: WEB_BASE_URL
+        fromService:
+          name: proofforge-web
+          type: web
+          property: host
+      # Absent until the GitHub App is registered; the API runs without it and
+      # records webhook state instead of publishing.
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_APP_PRIVATE_KEY
+        sync: false
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+
+  - type: web
+    name: proofforge-web
+    runtime: docker
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: .
+    plan: starter
+    envVars:
+      # Baked into the client bundle at build time, so a change here means a
+      # rebuild rather than a restart.
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          name: proofforge-api
+          type: web
+          property: host
+
+databases:
+  - name: proofforge-postgres
+    plan: basic-256mb
+    postgresMajorVersion: "16"
