@@ -26,6 +26,8 @@ export {
   type AnthropicProviderOptions,
 } from "./anthropic.js";
 
+export { createAnthropicProvider, type LiveAnthropicOptions } from "./anthropic-client.js";
+
 export {
   KNOWN_BASE_URLS,
   OpenAiCompatibleProvider,

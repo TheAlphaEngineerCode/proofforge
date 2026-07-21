@@ -74,15 +74,7 @@ place) plus the authenticated `/api/v1/github/webhook` endpoint and installation
 Deliveries are idempotent: a commit is analyzed once. Registering the App and pointing a
 public webhook URL at it is a manual step — see [docs/github-app.md](./docs/github-app.md).
 
-## Phase 5 — GitHub App (original scope) ⬜
-
-Install flow, webhooks, PR analysis, Checks API, PR comments, installation storage, minimal
-permissions, signature-validated webhooks.
-
-**Done when:** a PR triggers an analysis, status appears in GitHub, a comment is posted,
-permissions are minimal, webhooks are validated.
-
-## Phase 6 — Risk & Policy Engines ⬜
+## Phase 6 — Risk & Policy Engines ✅
 
 Deterministic, documented risk scoring; YAML policies with schema validation, versioning,
 violations, blocking and audited exceptions.
@@ -90,13 +82,34 @@ violations, blocking and audited exceptions.
 **Done when:** the score is reproducible, policies are validated, violations are shown,
 exceptions are audited, coverage is high.
 
-## Phase 7 — AI Agents ⬜
+## Phase 7 — AI Agents ✅
 
 Provider-agnostic AI layer and the Architect, Planning, Implementation, Reviewer and
 Evidence agents; cost control, logging, plan approval, prompt-injection defense.
 
+Built: a provider-neutral completion interface with Anthropic and OpenAI-compatible
+implementations, cost accounting, containment for untrusted repository content, planning,
+implementation and reviewer agents, a per-run budget, and an approval gate between planning
+and implementation.
+
+**Not done:** no agent has been run against a live model. The tests script the provider,
+which exercises the orchestration and says nothing about how a model actually answers. The
+prompts are unproven and the injection containment is proven structurally, not behaviourally.
+`packages/agents/scripts/smoke-review.ts` exists to close this; it needs a key.
+
 **Done when:** a user describes a task, a plan is generated and approved, a branch is
 created, the change is implemented, an independent review runs, and evidence is produced.
+
+## Observability ✅
+
+`packages/observability`: structured JSON logging with credential redaction, plus counters
+and histograms exposed at `GET /metrics` in Prometheus format. Deliberately not
+OpenTelemetry — the chain is still a single process, and a tracing backend would be more
+machinery than signal at this size.
+
+Collector provenance is counted by status, so a collector that has been unavailable for a
+week cannot read as a week of clean results. Deployment note: `/metrics` is unauthenticated
+and shares a port with the public API — block it at the reverse proxy.
 
 ## Phase 8 — Distributed system ⬜
 

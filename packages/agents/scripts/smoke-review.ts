@@ -20,6 +20,7 @@
  */
 
 import {
+  createAnthropicProvider,
   KNOWN_BASE_URLS,
   OpenAiCompatibleProvider,
   type AiProvider,
@@ -65,13 +66,14 @@ function providerFromEnv(): AiProvider {
   }
 
   if (ANTHROPIC_API_KEY !== undefined && ANTHROPIC_API_KEY !== "") {
-    throw new Error(
-      "ANTHROPIC_API_KEY is set but the real Anthropic client is not wired yet; " +
-        "use GROQ_API_KEY or OPENAI_BASE_URL for now",
-    );
+    // Last, not first: this is the only path that costs money, so an explicitly
+    // configured free provider wins when both are present.
+    return createAnthropicProvider(MODEL === undefined ? {} : { model: MODEL });
   }
 
-  throw new Error("set GROQ_API_KEY, or OPENAI_BASE_URL for any OpenAI-compatible server");
+  throw new Error(
+    "set GROQ_API_KEY, or OPENAI_BASE_URL for any OpenAI-compatible server, or ANTHROPIC_API_KEY",
+  );
 }
 
 async function main(): Promise<void> {
