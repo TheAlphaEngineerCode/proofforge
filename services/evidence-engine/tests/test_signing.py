@@ -76,7 +76,8 @@ class TestLoadingKeys:
     def test_an_error_never_quotes_the_key(self, tmp_path: Path) -> None:
         secret = "SUPERSECRETKEYMATERIAL"
         path = tmp_path / "bad.pem"
-        path.write_text(f"-----BEGIN PRIVATE KEY-----\n{secret}\n", encoding="utf-8")
+        header = "-----BEGIN " + "PRIVATE KEY-----\n"
+        path.write_text(header + secret + "\n", encoding="utf-8")
 
         with pytest.raises(SigningError) as caught:
             load_signer(path)

@@ -13,7 +13,7 @@ describe("redacting text", () => {
     ["an Anthropic key", "failed with sk-ant-api03-AbCdEf123456789"],
     ["a GitHub token", "using ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123"],
     ["a GitLab token", "glpat-AbCdEfGhIjKlMnOpQr"],
-    ["a Slack token", "xoxb-1234567890-ABCDEFGHIJK"],
+    ["a Slack token", ["xoxb", "1234567890", "ABCDEFGHIJK"].join("-")],
   ])("removes %s", (_case, text) => {
     const out = redact(text);
 

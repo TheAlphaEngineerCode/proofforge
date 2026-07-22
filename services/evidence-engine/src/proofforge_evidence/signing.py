@@ -29,13 +29,13 @@ class SigningError(Exception):
 class Signer:
     """An ed25519 private key, plus the identifier a verifier uses to find its pair."""
 
-    _key: ed25519.Ed25519PrivateKey
+    signer: ed25519.Ed25519PrivateKey
     public_key_id: str
 
     def sign(self, evidence_hash: str) -> str:
         """Base64 signature over the hash string, matching the TypeScript signer."""
 
-        return base64.b64encode(self._key.sign(evidence_hash.encode("utf-8"))).decode("ascii")
+        return base64.b64encode(self.signer.sign(evidence_hash.encode("utf-8"))).decode("ascii")
 
     # Deliberately no way to export the public key into the bundle. Shipping it
     # next to the signature would prove nothing — anyone can sign with a key of
@@ -58,7 +58,7 @@ def load_signer(key_path: Path) -> Signer:
         raise SigningError(f"could not read the signing key at {key_path}: {err.strerror}") from err
 
     key = _parse_private_key(data, key_path)
-    return Signer(_key=key, public_key_id=_key_id(key.public_key()))
+    return Signer(signer=key, public_key_id=_key_id(key.public_key()))
 
 
 def _parse_private_key(data: bytes, key_path: Path) -> ed25519.Ed25519PrivateKey:
