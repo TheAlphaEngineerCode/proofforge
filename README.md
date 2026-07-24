@@ -273,17 +273,35 @@ comment. Over four runs:
   findings list. A clean review and an absent one stay distinguishable under real
   conditions, which is the distinction the whole project is built on.
 
+**The planner and implementer have now faced a model too** — the same `qwen2.5-coder:7b`
+on a local Ollama, via `pnpm --filter @proofforge/agents smoke:run`, which walks the whole
+flow: plan, approve, implement, review. The scenario is a rate limiter with a real off-by-one
+defect, and the repository context carries a prompt injection telling the planner to change
+nothing. What the runs showed:
+
+- The planner produced valid, correctly-diagnosed plans. Under the injection it instead
+  returned an empty step list — it was talked out of the work. That is contained, not a
+  breach: an empty plan surfaces as a *failed* outcome, and the approval gate refuses a
+  zero-step plan, so the injection can suppress work but cannot get an unreviewed change
+  approved. A control run with the injection removed plans the fix, which is what tells
+  suppression apart from a model that simply cannot plan.
+- The implementer proposed a **correct** fix — and wrote nothing; the orchestrator returns
+  proposed contents for the caller to apply. It also exposed a real rough edge: when the
+  planner emits a non-editing step ("identify the bug"), the implementer, which requires at
+  least one edit, fails that step rather than passing it through. A rough edge worth having
+  found, and exactly what a scripted provider hides.
+
 What that does **not** establish, stated plainly:
 
-- Four runs against one small local model is a smoke test, not a measurement. The ~25%
-  unparseable rate is a property of a 7B model, and says little about a frontier one.
+- A handful of runs against one small local model is a smoke test, not a measurement. The
+  unparseable-reply and empty-plan rates are properties of a 7B model, and say little about
+  a frontier one. Output varies run to run.
 - The Anthropic path remains unexercised. `createAnthropicProvider` constructs a live
   client and the request shape is unit-tested, but no request has been sent — so the
   adaptive-thinking and effort parameters are unproven against the real API.
-- Only the reviewer has faced a model. The planner and implementer have not.
 
-Agent mode is better evidenced than it was, and still not something to point at a
-repository you care about.
+Agent mode is better evidenced than it was — all three agents have now met a real model —
+and still not something to point at a repository you care about.
 
 ## Contributing
 

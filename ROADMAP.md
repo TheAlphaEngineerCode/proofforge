@@ -92,10 +92,17 @@ implementations, cost accounting, containment for untrusted repository content, 
 implementation and reviewer agents, a per-run budget, and an approval gate between planning
 and implementation.
 
-**Not done:** no agent has been run against a live model. The tests script the provider,
-which exercises the orchestration and says nothing about how a model actually answers. The
-prompts are unproven and the injection containment is proven structurally, not behaviourally.
-`packages/agents/scripts/smoke-review.ts` exists to close this; it needs a key.
+**Exercised against a live model:** all three agents have now been run against
+`qwen2.5-coder:7b` on a local Ollama — the reviewer via `smoke-review.ts`, the planner and
+implementer via `smoke-orchestrate.ts` (plan → approve → implement → review). The reviewer
+reported an injected defect and recorded the suppression attempt; the planner produced correct
+plans and, under a context injection, was contained (empty plan → failed → approval refused);
+the implementer proposed a correct fix without writing it. The injection containment is now
+shown behaviourally, not only structurally.
+
+**Not done:** the Anthropic path has had no request sent, so the adaptive-thinking and effort
+parameters are unproven against the real API. A few runs on one small local model is a smoke
+test, not a measurement.
 
 **Done when:** a user describes a task, a plan is generated and approved, a branch is
 created, the change is implemented, an independent review runs, and evidence is produced.
