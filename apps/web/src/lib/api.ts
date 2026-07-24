@@ -46,9 +46,16 @@ export interface DevLoginResponse {
   user: User;
 }
 
+/** Which sign-in methods this deployment offers. */
+export interface AuthConfig {
+  github: boolean;
+  devLogin: boolean;
+}
+
 export const api = {
   devLogin: () =>
     request<DevLoginResponse>("/api/v1/auth/dev-login", { method: "POST", body: "{}" }),
+  authConfig: () => request<AuthConfig>("/api/v1/auth/config"),
   me: () => request<User>("/api/v1/me"),
 
   listOrganizations: () => request<Organization[]>("/api/v1/organizations"),
@@ -80,6 +87,16 @@ export const api = {
 export function errorMessage(e: unknown): string {
   if (e instanceof ApiError) return e.message;
   return e instanceof Error ? e.message : "unexpected error";
+}
+
+/**
+ * Where the browser goes to sign in with GitHub.
+ *
+ * A full page navigation, not a fetch: the flow leaves this origin for GitHub's
+ * consent screen, so XHR would only ever be blocked by CORS.
+ */
+export function githubLoginUrl(redirectTo = "/dashboard"): string {
+  return `${API_URL}/api/v1/auth/github?redirect=${encodeURIComponent(redirectTo)}`;
 }
 
 /** URL for the SSE stream. EventSource cannot set headers, so the token rides as a query param. */

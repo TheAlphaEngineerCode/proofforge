@@ -34,6 +34,10 @@ services:
       # matches, so every dashboard request would be blocked.
       - key: WEB_BASE_URL
         sync: false
+      # This service's own public origin, which GitHub returns the browser to.
+      # `fromService` yields a bare host, and the callback must be a full URL.
+      - key: API_BASE_URL
+        sync: false
       # Absent until the GitHub App is registered; the API runs without it and
       # records webhook state instead of publishing.
       - key: GITHUB_APP_ID
@@ -42,6 +46,17 @@ services:
         sync: false
       - key: GITHUB_WEBHOOK_SECRET
         sync: false
+      # Sign-in. Without these the deployment has no way in: dev-login is forced
+      # off in production, so the dashboard would render a card and no button.
+      - key: GITHUB_APP_CLIENT_ID
+        sync: false
+      - key: GITHUB_APP_CLIENT_SECRET
+        sync: false
+      # Signs the OAuth state. Render generates it once and every instance of
+      # the service reads the same value — which is the point: a per-process
+      # secret makes logins fail whenever the callback lands on the other one.
+      - key: AUTH_STATE_SECRET
+        generateValue: true
 
   - type: web
     name: proofforge-web

@@ -7,7 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { analysisEventsUrl, api, ApiError, errorMessage } from "@/lib/api";
+import { analysisEventsUrl, api, ApiError, errorMessage, githubLoginUrl } from "@/lib/api";
 import { clearToken, setToken } from "@/lib/session";
 
 function respondWith(body: unknown, init: ResponseInit = {}): void {
@@ -108,6 +108,18 @@ describe("describing an error to the user", () => {
     // A thrown non-Error reaches here; "[object Object]" in the UI is the
     // failure this guards against.
     expect(errorMessage({ weird: true })).toBe("unexpected error");
+  });
+});
+
+describe("the github sign-in url", () => {
+  it("asks the API to come back to the page the user wanted", () => {
+    expect(githubLoginUrl("/repositories/7")).toContain(
+      "/api/v1/auth/github?redirect=%2Frepositories%2F7",
+    );
+  });
+
+  it("defaults to the dashboard", () => {
+    expect(githubLoginUrl()).toContain("redirect=%2Fdashboard");
   });
 });
 

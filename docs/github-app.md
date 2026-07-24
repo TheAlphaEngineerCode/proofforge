@@ -14,6 +14,7 @@ requests, publishes a Check Run on the commit and posts (or updates) a verificat
 | Deterministic verdict from the manifest | ✅ |
 | Installation records | ✅ |
 | Idempotent deliveries (a commit is analyzed once) | ✅ |
+| OAuth sign-in for the dashboard (signed state, no stored user token) | ✅ |
 
 ## Registering the App (automated)
 
@@ -84,6 +85,69 @@ are still authenticated and recorded, but nothing is published back to GitHub. W
 `GITHUB_WEBHOOK_SECRET` the endpoint returns `503` — it never accepts unauthenticated
 deliveries.
 
+## Signing people in
+
+The same App also authenticates *users*. A GitHub App carries its own OAuth
+credentials, so the dashboard needs no second OAuth App: the `client_id` that
+identifies ProofForge to a repository identifies it to a person too.
+
+Set the **Callback URL** on the App to `<API_BASE_URL>/api/v1/auth/github/callback`
+(`http://localhost:3001/api/v1/auth/github/callback` in development), then:
+
+```bash
+GITHUB_APP_CLIENT_ID=Iv1.xxxxxxxxxxxx
+GITHUB_APP_CLIENT_SECRET=<generated on the App's settings page>
+API_BASE_URL=https://api.example.com     # this API's public origin
+WEB_BASE_URL=https://app.example.com     # where the browser is sent afterwards
+AUTH_STATE_SECRET=<32+ random bytes>     # required in production
+```
+
+Without the client id and secret, `GET /api/v1/auth/github` answers `503` and
+`GET /api/v1/auth/config` reports `github: false`, so the dashboard offers only
+what actually works. **In production that leaves no way in at all** — `dev-login`
+is forced off there regardless of the environment.
+
+The flow, and why each part is shaped the way it is:
+
+```text
+GET /api/v1/auth/github?redirect=/dashboard
+  → sign a 10-minute `state` carrying the redirect
+  → hand the browser the same nonce as an HttpOnly cookie  → 302 to GitHub
+GET /api/v1/auth/github/callback?code&state
+  → verify state, and that the cookie matches it
+      (either missing → back to the dashboard with an error code)
+  → exchange the code for a user token
+  → read /user (and /user/emails when the profile hides the address)
+  → match on the numeric GitHub id, create the user if new
+  → 302 to WEB_BASE_URL/auth/callback#token=…
+```
+
+- **`state` is signed, not stored.** A callback can land on any replica behind a
+  load balancer; state held in one process's memory would fail intermittently
+  once there are two. That is also why `AUTH_STATE_SECRET` must be *shared* and
+  set explicitly in production — locally, a per-process value is generated.
+- **And bound to the browser that started the login.** A signature proves only
+  that *this service* issued the state, never that it issued it to *this*
+  browser. Without the second half, an attacker can authorize with their own
+  account, capture the callback URL before using it, and send it to someone
+  else — whose browser completes a login into the attacker's account, where
+  everything they then connect is visible to the attacker (RFC 6749 §10.12). So
+  the nonce inside the state is also set as a short-lived `HttpOnly`,
+  `SameSite=Lax` cookie, and the callback requires both. It is `Lax` rather than
+  `Strict` because the callback *is* a cross-site top-level navigation, and
+  `Strict` would withhold the cookie on the one request that needs it. A browser
+  that refuses cookies cannot sign in — that is the trade, and it is the right
+  way round.
+- **The redirect travels inside the signature**, and only ever as a same-site
+  path, so a login URL cannot be crafted into an open redirect.
+- **The session arrives in the URL fragment**, which is never sent to a server:
+  the token stays out of access logs, proxies and the `Referer` header.
+- **The user's GitHub token is used once and dropped.** ProofForge acts on
+  repositories with installation tokens, so keeping a personal token would be
+  storing a credential it has no use for.
+- **Users are matched on the numeric id**, which survives a rename; a login does
+  not. A profile with no public address gets GitHub's own stable noreply form.
+
 ## Security model
 
 - **Every delivery is authenticated before it is parsed.** The signature covers the raw
@@ -114,6 +178,10 @@ the existing comment rather than adding a new one to the thread.
 
 ## Remaining integration step
 
-The code path is complete and tested against fakes. What has not been exercised is a live
-delivery from GitHub — that requires the App registration above plus a publicly reachable
-webhook URL.
+The webhook path has been exercised against real deliveries from a sandbox repository,
+which is where four defects that fakes had not shown were found and fixed.
+
+The **OAuth path has not**: it is covered end to end over HTTP with GitHub itself stubbed,
+so the routes, the state signing and the session are real while the consent screen is not.
+Registering the App with a callback URL and signing in once is the step that would close
+this — and, on the evidence of the webhook side, the step that finds what stubs hide.

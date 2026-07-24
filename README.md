@@ -169,8 +169,10 @@ in the load balancer answering nothing.
 
 The API image sets `NODE_ENV=production`, which disables the credential-free dev login
 regardless of `AUTH_DEV_LOGIN` — the route returns 404 rather than existing and refusing.
-Without `DATABASE_URL` it falls back to in-memory storage and says so in the logs; nothing
-is persisted across a restart.
+That makes `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET` and `AUTH_STATE_SECRET` the
+difference between a deployment people can sign in to and one nobody can; see
+[docs/github-app.md](./docs/github-app.md). Without `DATABASE_URL` it falls back to
+in-memory storage and says so in the logs; nothing is persisted across a restart.
 
 `NEXT_PUBLIC_API_URL` is read by the dashboard's client bundle at **build** time, so
 pointing it at a different API means rebuilding the image, not restarting the container.
@@ -246,7 +248,7 @@ already prove things. Full plan in [ROADMAP.md](./ROADMAP.md).
 - **Phase 2** — Repository Analyzer ✅
 - **Phase 3** — Evidence Engine (sandboxed) ✅
 - **Phase 4** — API + Dashboard ✅
-- **Phase 5** — GitHub App ✅
+- **Phase 5** — GitHub App, including OAuth sign-in ✅
 - **Phase 6** — Risk & Policy engines ✅
 - **Phase 7** — AI agents (provider-neutral) ✅
 - **Observability** — structured logs, metrics at `/metrics` ✅

@@ -63,8 +63,8 @@ policies; Next.js dashboard with real-time status.
   **live SSE pipeline timeline** and the rendered proof-manifest.
 
 **Done when:** login works, a repo is connected, an analysis starts from the UI, status is
-live, a visual report is available. ✅ (GitHub OAuth login is Phase 5; local dev-login works
-today. Wiring the Python evidence engine into the runner is later-phase.)
+live, a visual report is available. ✅ (Sign-in is GitHub OAuth, delivered with Phase 5;
+dev-login remains for local work and is forced off in production.)
 
 ## Phase 5 — GitHub App ✅
 
@@ -73,6 +73,16 @@ installation tokens, REST client, deterministic verdict → Check Run, PR commen
 place) plus the authenticated `/api/v1/github/webhook` endpoint and installation records.
 Deliveries are idempotent: a commit is analyzed once. Registering the App and pointing a
 public webhook URL at it is a manual step — see [docs/github-app.md](./docs/github-app.md).
+
+**Sign-in** uses the same App's OAuth credentials, so no second OAuth App exists to
+register. The `state` is signed rather than stored, which keeps a callback valid whichever
+replica it lands on, *and* bound to the browser that started the login by a short-lived
+`HttpOnly` cookie — a signature alone would let a captured callback URL log someone into
+the attacker's account. The redirect it carries is confined to a same-site path; the
+session comes back in the URL fragment, which never reaches a server log; and the user's
+GitHub token is read once and dropped, since ProofForge acts on repositories with
+installation tokens. Live GitHub was stubbed for the tests — the consent screen is the one
+part of this that has not run for real.
 
 ## Phase 6 — Risk & Policy Engines ✅
 
