@@ -99,6 +99,44 @@ jobs:
           TEST_DATABASE_URL: postgresql://postgres:proofforge@localhost:5432/proofforge
         run: pnpm --filter @proofforge/database test
 
+  redis:
+    name: Queue · Redis integration
+    runs-on: ubuntu-latest
+    # The in-memory queue is what every other job exercises. This one runs the
+    # BullMQ backend against a real Redis, where job-id deduplication and pub/sub
+    # delivery across connections are decided rather than assumed.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run the queue tests against Redis
+        env:
+          TEST_REDIS_URL: redis://localhost:6379
+        run: pnpm --filter @proofforge/queue test
+
   python:
     name: Python services · Ruff · mypy · pytest
     runs-on: ubuntu-latest

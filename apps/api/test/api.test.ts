@@ -118,7 +118,7 @@ describe("analysis pipeline", () => {
     const analysis = started.json() as { id: string; status: string };
     expect(analysis.status).toBe("CREATED");
 
-    await ctx.deps.runner.wait(analysis.id);
+    await ctx.deps.queue.settle(analysis.id);
 
     const finished = (
       await ctx.app.inject({ url: `/api/v1/analyses/${analysis.id}`, headers: auth(token) })

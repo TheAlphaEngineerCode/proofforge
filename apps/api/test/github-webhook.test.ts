@@ -70,7 +70,9 @@ async function connectRepository(owner: string, name: string): Promise<string> {
 
 describe("github webhook — authentication", () => {
   it("rejects a delivery with an invalid signature", async () => {
-    const res = await ctx.app.inject(delivery("pull_request", pullRequestPayload(), "wrong-secret"));
+    const res = await ctx.app.inject(
+      delivery("pull_request", pullRequestPayload(), "wrong-secret"),
+    );
     expect(res.statusCode).toBe(401);
   });
 
@@ -111,7 +113,7 @@ describe("github webhook — routing", () => {
     const body = res.json() as { status: string; analysisId: string };
     expect(body.status).toBe("analysis_started");
 
-    await ctx.deps.runner.wait(body.analysisId);
+    await ctx.deps.queue.settle(body.analysisId);
     const analysis = await ctx.deps.storage.getAnalysis(body.analysisId);
     expect(analysis?.commitSha).toBe("a".repeat(40));
     expect(analysis?.evidenceBundleId).toBeTruthy();
@@ -146,7 +148,9 @@ describe("github webhook — routing", () => {
   });
 
   it("ignores repositories that are not connected", async () => {
-    const res = await ctx.app.inject(delivery("pull_request", pullRequestPayload("someone", "else")));
+    const res = await ctx.app.inject(
+      delivery("pull_request", pullRequestPayload("someone", "else")),
+    );
     expect(res.statusCode).toBe(202);
     expect((res.json() as { status: string }).status).toBe("ignored");
   });

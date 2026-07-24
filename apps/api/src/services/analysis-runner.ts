@@ -13,10 +13,10 @@ import {
   canTransition,
   EVENT_SCHEMA_VERSION,
   type AnalysisStatus,
+  type EventPublisher,
   type RiskLevel,
 } from "@proofforge/shared-types";
 import type { Manifest } from "@proofforge/evidence-spec";
-import type { EventBus } from "../events.js";
 import { buildAnalysisManifest } from "../manifest.js";
 import {
   ANALYSES_TOTAL,
@@ -62,7 +62,7 @@ export class AnalysisRunner {
 
   constructor(
     private readonly storage: Storage,
-    private readonly events: EventBus,
+    private readonly events: EventPublisher,
     private readonly stepMs: number,
     private readonly evidence?: EvidencePipeline,
     private readonly logger: RunnerLogger = { warn: (message) => console.warn(message) },

@@ -34,3 +34,15 @@ export interface AnalysisErrorEvent {
 }
 
 export type AnalysisEvent = AnalysisStatusEvent | AnalysisCompletedEvent | AnalysisErrorEvent;
+
+/** Anything that can emit an analysis event: the pipeline publishes, and it does
+ *  not care whether the other side is an in-process bus or a Redis channel. */
+export interface EventPublisher {
+  publish(analysisId: string, event: AnalysisEvent): void;
+}
+
+/** The read side: an SSE connection subscribes to one analysis and unsubscribes
+ *  when the client goes away. */
+export interface EventSubscriber {
+  subscribe(analysisId: string, listener: (event: AnalysisEvent) => void): () => void;
+}

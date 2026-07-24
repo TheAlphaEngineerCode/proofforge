@@ -31,4 +31,8 @@ export {
   type AnalysisStatusEvent,
   type AnalysisCompletedEvent,
   type AnalysisErrorEvent,
+  type EventPublisher,
+  type EventSubscriber,
 } from "./events.js";
+
+export { type AnalysisJob, type PublishInstruction } from "./jobs.js";

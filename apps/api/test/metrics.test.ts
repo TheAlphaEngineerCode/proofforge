@@ -54,13 +54,11 @@ describe("the metrics endpoint", () => {
         payload: { commitSha: "9c82fd1a2b3c4d5e6f708192a3b4c5d6e7f80912" },
       })
     ).json() as { id: string };
-    await ctx.deps.runner.wait(started.id);
+    await ctx.deps.queue.settle(started.id);
 
     const body = (await ctx.app.inject({ url: "/metrics" })).body;
 
-    expect(body).toContain(
-      'proofforge_analyses_total{status="WAITING_FOR_HUMAN_APPROVAL"} 1',
-    );
+    expect(body).toContain('proofforge_analyses_total{status="WAITING_FOR_HUMAN_APPROVAL"} 1');
     expect(body).toContain("proofforge_analysis_duration_seconds_count");
   });
 

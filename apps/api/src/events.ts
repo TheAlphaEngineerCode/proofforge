@@ -5,11 +5,11 @@
  * A distributed deployment (Phase 8) swaps this for Redis/NATS behind the same
  * publish/subscribe shape.
  */
-import type { AnalysisEvent } from "@proofforge/shared-types";
+import type { AnalysisEvent, EventPublisher, EventSubscriber } from "@proofforge/shared-types";
 
 type Listener = (event: AnalysisEvent) => void;
 
-export class EventBus {
+export class EventBus implements EventPublisher, EventSubscriber {
   private readonly listeners = new Map<string, Set<Listener>>();
 
   publish(analysisId: string, event: AnalysisEvent): void {

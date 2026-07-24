@@ -7,25 +7,19 @@
  */
 import type { Manifest } from "@proofforge/evidence-spec";
 import type { Storage } from "@proofforge/database";
+import type { PublishInstruction } from "@proofforge/shared-types";
 import {
   mapManifestToCheckRun,
   renderPullRequestComment,
   upsertVerificationComment,
   type GitHubClient,
-  type RepoRef,
 } from "@proofforge/github";
 
-export interface PublishTarget extends RepoRef {
-  headSha: string;
-  /** Present for pull requests; absent for plain pushes. */
-  pullRequest?: number;
-  /**
-   * Set when the check run for this commit was already published by an earlier
-   * event, so a later one can add the pull request comment without producing a
-   * second, duplicate check run.
-   */
-  commentOnly?: boolean;
-}
+/**
+ * Where to report a result. This is the job's `publish` field: the same plain
+ * data whether the run happened in this process or a worker pulled it off Redis.
+ */
+export type PublishTarget = PublishInstruction;
 
 export interface Logger {
   warn(message: string): void;
@@ -42,7 +36,9 @@ export class GitHubPublisher {
     try {
       const manifest = await this.loadManifest(analysisId);
       if (!manifest) {
-        this.logger.warn(`[github] analysis ${analysisId} produced no manifest; nothing to publish`);
+        this.logger.warn(
+          `[github] analysis ${analysisId} produced no manifest; nothing to publish`,
+        );
         return;
       }
 

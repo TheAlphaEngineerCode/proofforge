@@ -250,7 +250,8 @@ already prove things. Full plan in [ROADMAP.md](./ROADMAP.md).
 - **Phase 6** — Risk & Policy engines ✅
 - **Phase 7** — AI agents (provider-neutral) ✅
 - **Observability** — structured logs, metrics at `/metrics` ✅
-- **Phase 8** — Distributed workers
+- **Phase 8** — Distributed workers 🚧 (queue, workers and cross-process events done; images,
+  Kubernetes/Helm and tracing remain)
 - **Phase 9** — SDK & plugins
 
 ### What Phase 7 contains, and what it has been through

@@ -73,10 +73,15 @@ Two properties make it trustworthy:
   by the API and the dashboard.
 - **`packages/database`** — Drizzle/PostgreSQL schema for every entity plus a `Storage`
   interface with an in-memory backend (local/tests) and a PostgreSQL client factory.
+- **`packages/queue`** — a `JobQueue` with an in-process backend and a BullMQ/Redis backend,
+  and a `RedisEventBus` that carries pipeline events between processes. The same
+  configuration-driven seam as storage: `REDIS_URL` unset keeps everything in one process.
 - **`apps/api`** — Fastify REST API: bearer-token session auth with organization-scoped
   tenant isolation; organizations, repositories, analyses, evidence bundles and policies; an
-  in-process analysis runner that walks the state machine and streams status over SSE; and a
-  schema-valid `proof-manifest.json` per analysis, verifiable by the CLI.
+  analysis runner that walks the state machine and streams status over SSE; and a schema-valid
+  `proof-manifest.json` per analysis, verifiable by the CLI. Analyses run in-process by default;
+  with `REDIS_URL` set the API only enqueues and a separate `worker` entrypoint runs them,
+  events bridged back over Redis.
 - **`apps/web`** — Next.js (App Router) dashboard: landing page, organizations/repositories
   dashboard, repository detail with analysis triggering, and an analysis page with a live SSE
   pipeline timeline and the rendered proof-manifest. Consumes the API via a typed client.

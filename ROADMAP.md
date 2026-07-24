@@ -118,12 +118,25 @@ Collector provenance is counted by status, so a collector that has been unavaila
 week cannot read as a week of clean results. Deployment note: `/metrics` is unauthenticated
 and shares a port with the public API — block it at the reverse proxy.
 
-## Phase 8 — Distributed system ⬜
+## Phase 8 — Distributed system 🚧
 
 Queues, workers, retries, idempotency, scalability, Kubernetes, Helm, distributed tracing.
 
 **Done when:** many jobs run in parallel, failures recover, jobs are idempotent, metrics
 are available, deploys are reproducible.
+
+**Done (8a — queue, workers, cross-process events):** `packages/queue` provides a `JobQueue`
+with an in-process backend and a BullMQ/Redis backend, and a `RedisEventBus` that moves
+pipeline events between processes. `apps/api` chooses its backend from `REDIS_URL`: unset, it
+runs analyses in-process as before; set, it only enqueues while separate `worker` processes run
+them, publishing events back over Redis to the SSE route. The analysis id is the job id, so a
+webhook re-delivery cannot start the same analysis twice; failed jobs retry with backoff. The
+in-memory backend keeps every other test hermetic; a Redis integration job and an end-to-end
+distributed test (enqueue in one instance, run in a worker, events bridged back) run against a
+real server. Metrics from Observability already count per-collector provenance across all runs.
+
+**Remaining:** container images for the API and worker, Kubernetes manifests and a Helm chart
+(8b), and distributed tracing across the enqueue/run boundary now that it spans processes (8c).
 
 ## Phase 9 — SDK & plugins ⬜
 

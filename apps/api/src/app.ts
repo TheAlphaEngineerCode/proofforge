@@ -39,6 +39,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   await app.register(cors, { origin: deps.config.webOrigin, credentials: true });
 
+  // Release the queue and any event-bridge connections when the server stops.
+  app.addHook("onClose", async () => {
+    await deps.close?.();
+  });
+
   registerErrorHandler(app);
   registerAuth(app, deps.storage);
 

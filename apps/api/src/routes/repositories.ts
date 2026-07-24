@@ -47,7 +47,14 @@ export function repositoryRoutes(app: FastifyInstance, deps: AppDeps): void {
       commitSha: input.commitSha,
     });
     // Fire-and-forget: the pipeline runs asynchronously and streams events.
-    void deps.runner.start(analysis.id);
+    // A manually-triggered analysis has nowhere to report back to, so no publish.
+    // A rejected enqueue (a Redis fault) is logged, not thrown: it must not
+    // become an unhandled rejection that takes the API down. The analysis stays
+    // in its created state, visible as never having started.
+    void deps.queue.enqueue({ analysisId: analysis.id }).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[api] failed to enqueue analysis ${analysis.id}: ${message}`);
+    });
 
     void reply.status(202);
     return analysis;

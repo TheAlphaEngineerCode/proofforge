@@ -5,6 +5,12 @@ const ConfigSchema = z.object({
   host: z.string().default("0.0.0.0"),
   port: z.coerce.number().int().positive().default(3001),
   databaseUrl: z.string().optional(),
+  /**
+   * When set, analyses are enqueued to Redis and run by separate workers;
+   * otherwise the queue is in-process and runs them here. Distribution is opt-in
+   * exactly like the database is.
+   */
+  redisUrl: z.string().optional(),
   /** Enables POST /api/v1/auth/dev-login. Never enable in production. */
   devLogin: z.coerce.boolean().default(true),
   webOrigin: z.string().default("http://localhost:3000"),
@@ -32,6 +38,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     host: env.API_HOST,
     port: env.API_PORT,
     databaseUrl: env.DATABASE_URL,
+    redisUrl: env.REDIS_URL,
     devLogin: env.AUTH_DEV_LOGIN,
     webOrigin: env.WEB_BASE_URL,
     pipelineStepMs: env.PIPELINE_STEP_MS,

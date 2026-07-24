@@ -11,8 +11,9 @@
  */
 import type { FastifyInstance } from "fastify";
 import { parseWebhook, verifyWebhookSignature } from "@proofforge/github";
+import { isTerminal } from "@proofforge/shared-types";
 import type { AppDeps } from "../deps.js";
-import type { PublishTarget } from "../services/github-publisher.js";
+import type { GitHubPublisher, PublishTarget } from "../services/github-publisher.js";
 
 interface WebhookHeaders {
   "x-hub-signature-256"?: string;
@@ -158,10 +159,7 @@ async function startAnalysis(
         pullRequest: input.pullRequest,
         commentOnly: true,
       };
-      void deps.runner
-        .wait(existing.id)
-        .then(() => publisher.publish(target, existing.id))
-        .catch(() => {});
+      publishOnSettle(deps, publisher, existing.id, target);
     }
     return { status: "already_analyzed", analysisId: existing.id };
   }
@@ -171,20 +169,70 @@ async function startAnalysis(
     commitSha: input.headSha,
   });
 
-  const run = deps.runner.start(analysis.id);
+  // The publish target travels with the job: whoever runs the analysis — this
+  // process or a worker off Redis — reports the result when the run finishes.
+  const target: PublishTarget | undefined =
+    publisher && installationId !== null
+      ? {
+          owner: input.owner,
+          repo: input.repo,
+          installationId,
+          headSha: input.headSha,
+          ...(input.pullRequest === undefined ? {} : { pullRequest: input.pullRequest }),
+        }
+      : undefined;
 
-  if (publisher && installationId !== null) {
-    const target: PublishTarget = {
-      owner: input.owner,
-      repo: input.repo,
-      installationId,
-      headSha: input.headSha,
-      ...(input.pullRequest === undefined ? {} : { pullRequest: input.pullRequest }),
-    };
-    // Fire-and-forget, but never unhandled: the runner and publisher swallow their
-    // own errors today, and this keeps that true if either ever stops doing so.
-    void run.then(() => publisher.publish(target, analysis.id)).catch(() => {});
-  }
+  void deps.queue
+    .enqueue({
+      analysisId: analysis.id,
+      ...(target === undefined ? {} : { publish: target }),
+    })
+    .catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[github] failed to enqueue analysis ${analysis.id}: ${message}`);
+    });
 
   return { status: "analysis_started", analysisId: analysis.id };
+}
+
+/**
+ * Publish a pull-request comment once the analysis it belongs to has settled.
+ *
+ * The already-analysed re-delivery cannot travel with the run — the run may
+ * already be underway in a worker — so it waits for the completion event, which
+ * reaches this process whether the run happened here or was bridged from a
+ * worker over Redis. The analysis record is the backstop for a run that finished
+ * before we subscribed, and a timeout keeps a lost run from holding the
+ * subscription forever. Whichever fires first, the publish happens once.
+ */
+function publishOnSettle(
+  deps: AppDeps,
+  publisher: GitHubPublisher,
+  analysisId: string,
+  target: PublishTarget,
+): void {
+  let settled = false;
+  let unsubscribe: () => void = () => {};
+
+  const timer = setTimeout(() => {
+    settled = true;
+    unsubscribe();
+  }, 300_000);
+  timer.unref();
+
+  const finish = (): void => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(timer);
+    unsubscribe();
+    void publisher.publish(target, analysisId).catch(() => {});
+  };
+
+  unsubscribe = deps.events.subscribe(analysisId, (event) => {
+    if (event.type === "completed" || event.type === "error") finish();
+  });
+
+  void deps.storage.getAnalysis(analysisId).then((current) => {
+    if (current && isTerminal(current.status)) finish();
+  });
 }

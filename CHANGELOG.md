@@ -8,6 +8,14 @@ All notable changes to this project are documented here. The format is based on
 
 ### Added
 
+- **Phase 8 (queue + workers) — distributing the pipeline.** `packages/queue`: a `JobQueue`
+  interface with an in-process backend and a BullMQ/Redis backend, plus a `RedisEventBus` that
+  carries pipeline events across processes. `apps/api` gains a `worker` entrypoint and selects
+  its backend from `REDIS_URL` — unset runs analyses in-process exactly as before; set, the API
+  only enqueues and one or more workers run them, streaming events back over Redis to the SSE
+  route. Deliveries are idempotent (the analysis id is the job id) and failed jobs are retried
+  with backoff. The distributed path is proven end to end against a real Redis: an enqueued
+  analysis runs to a terminal state in a separate worker and its events arrive on the API's bus.
 - **Phase 0 — Foundation.** Monorepo scaffolding with pnpm workspaces and Turborepo;
   shared TypeScript and Python configuration; Prettier, ESLint, Vitest and Ruff/mypy;
   Docker Compose for PostgreSQL, Redis and MinIO; Makefile and developer scripts; GitHub
