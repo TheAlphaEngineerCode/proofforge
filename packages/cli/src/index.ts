@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { SPEC_VERSION } from "@proofforge/evidence-spec";
 import { manifestInspect, manifestValidate } from "./commands/manifest.js";
 import { evidenceVerify } from "./commands/evidence.js";
+import { evidenceBuild } from "./commands/evidence-build.js";
 import { policyEvaluate, policyValidate } from "./commands/policy.js";
 import { analyze } from "./commands/analyze.js";
 import { init } from "./commands/init.js";
@@ -37,7 +38,39 @@ manifest
     process.exitCode = runCommand(() => manifestInspect(file, { json: opts.json }));
   });
 
-const evidence = program.command("evidence").description("Verify evidence bundles");
+const evidence = program.command("evidence").description("Build and verify evidence bundles");
+
+evidence
+  .command("build")
+  .description("Run the evidence engine over a local repository and verify the manifest it produces")
+  .argument("<path>", "path to the repository root")
+  .option("--base <sha>", "base commit the diff is taken against (default: HEAD~1)")
+  .option("--output-dir <dir>", "where the engine writes the bundle (default: <repo>/.proofforge/bundle)")
+  .option("--signing-key <file>", "ed25519 private key (PEM or raw base64) to sign the manifest")
+  .option("--image <digest>", "sandbox image digest to record in the manifest")
+  .option("--json", "emit machine-readable JSON output", false)
+  .action(
+    (
+      path: string,
+      opts: {
+        base?: string;
+        outputDir?: string;
+        signingKey?: string;
+        image?: string;
+        json: boolean;
+      },
+    ) => {
+      process.exitCode = runCommand(() =>
+        evidenceBuild(path, {
+          json: opts.json,
+          base: opts.base,
+          outputDir: opts.outputDir,
+          signingKey: opts.signingKey,
+          image: opts.image,
+        }),
+      );
+    },
+  );
 
 evidence
   .command("verify")
