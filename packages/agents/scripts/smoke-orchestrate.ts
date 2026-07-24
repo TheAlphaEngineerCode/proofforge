@@ -98,7 +98,8 @@ function providerFromEnv(): AiProvider {
       // Ollama wants a bearer token it then ignores.
       apiKey: OPENAI_API_KEY ?? "unused",
       model: MODEL ?? "qwen2.5-coder",
-      // A local model on CPU is slow, and the flow makes three sequential calls.
+      // A local model on CPU is slow, and the flow makes one call per plan step
+      // plus one to plan and one to review — several minutes end to end.
       timeoutMs: 300_000,
     });
   }
@@ -213,12 +214,12 @@ async function main(): Promise<void> {
 
   // 4 — Review the change the implementer actually produced.
   out("\n== REVIEW ==");
-  const changedPath = [...proposedByPath.keys()].find((p) => p === RATE_LIMIT_PATH);
+  const proposed = proposedByPath.get(RATE_LIMIT_PATH);
   let reviewStatus = "skipped";
-  if (changedPath === undefined) {
+  if (proposed === undefined) {
     out("no edit to the target file was produced, so there is nothing to review");
   } else {
-    const diff = diffOf(RATE_LIMIT_SOURCE, proposedByPath.get(changedPath) ?? "", changedPath);
+    const diff = diffOf(RATE_LIMIT_SOURCE, proposed, RATE_LIMIT_PATH);
     const review = await reviewChange(provider, { diff });
     reviewStatus = review.status;
     if (review.status === "failed") {
