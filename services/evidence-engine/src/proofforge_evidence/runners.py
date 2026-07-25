@@ -14,8 +14,20 @@ Supported today:
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
+
+#: The images the sandbox runs, published by this repository's `sandbox-images`
+#: workflow. The namespace has to be an account we own: `ghcr.io/proofforge`
+#: belongs to somebody else, so images named after it could never be pushed and
+#: every test run pulled an image that does not exist. Both are overridable so a
+#: fork, a mirror or an install with no route to ghcr can point elsewhere without
+#: patching the source.
+DEFAULT_PYTHON_IMAGE = "ghcr.io/thealphaengineercode/proofforge-sandbox-python:3.12"
+DEFAULT_NODE_IMAGE = "ghcr.io/thealphaengineercode/proofforge-sandbox-node:20"
+PYTHON_IMAGE_ENV = "PROOFFORGE_SANDBOX_PYTHON_IMAGE"
+NODE_IMAGE_ENV = "PROOFFORGE_SANDBOX_NODE_IMAGE"
 
 #: Where the sandbox writes reports. Mounted read-write; everything else is not.
 OUTPUT_DIR = "/out"
@@ -41,6 +53,18 @@ class RunnerPlan:
 
 class UnsupportedStackError(Exception):
     """Raised when no runner can honestly claim to test this repository."""
+
+
+def python_image() -> str:
+    """The image Python repositories are tested in."""
+
+    return os.environ.get(PYTHON_IMAGE_ENV, "").strip() or DEFAULT_PYTHON_IMAGE
+
+
+def node_image() -> str:
+    """The image Node repositories are tested in."""
+
+    return os.environ.get(NODE_IMAGE_ENV, "").strip() or DEFAULT_NODE_IMAGE
 
 
 def detect_stack(repo: Path) -> str:
@@ -70,7 +94,7 @@ def plan_for(stack: str) -> RunnerPlan:
         # pytest-cov from the image rather than downloading them again.
         return RunnerPlan(
             stack=stack,
-            image="ghcr.io/proofforge/sandbox-python:3.12",
+            image=python_image(),
             script=_script(
                 install="python -m venv --system-site-packages .venv; "
                 ". .venv/bin/activate; "
@@ -90,7 +114,7 @@ def plan_for(stack: str) -> RunnerPlan:
     if stack == "vitest":
         return RunnerPlan(
             stack=stack,
-            image="ghcr.io/proofforge/sandbox-node:20",
+            image=node_image(),
             script=_script(
                 install="if [ -f pnpm-lock.yaml ]; then pnpm install --frozen-lockfile; "
                 "elif [ -f package-lock.json ]; then npm ci; else npm install; fi",
@@ -125,7 +149,7 @@ def benchmark_plan_for(repo: Path) -> RunnerPlan:
 
     return RunnerPlan(
         stack="pytest-benchmark",
-        image="ghcr.io/proofforge/sandbox-python:3.12",
+        image=python_image(),
         script=_script(
             install="python -m venv --system-site-packages .venv; "
             ". .venv/bin/activate; "

@@ -76,3 +76,48 @@ class TestPlans:
     def test_unknown_stack(self) -> None:
         with pytest.raises(runners.UnsupportedStackError):
             runners.plan_for("maven")
+
+
+class TestImages:
+    """Which image the sandbox pulls, and who is allowed to publish it."""
+
+    @pytest.mark.parametrize(
+        ("stack", "expected"),
+        [("pytest", runners.DEFAULT_PYTHON_IMAGE), ("vitest", runners.DEFAULT_NODE_IMAGE)],
+    )
+    def test_default_image_lives_where_we_can_publish_it(
+        self, stack: str, expected: str, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An image in a namespace we do not own can never be pushed to.
+
+        The first name here was `ghcr.io/proofforge/…`, which belongs to another
+        account: every test run pulled an image that could not exist, and the
+        collector reported a timeout that no amount of fixing here would clear.
+        """
+        monkeypatch.delenv(runners.PYTHON_IMAGE_ENV, raising=False)
+        monkeypatch.delenv(runners.NODE_IMAGE_ENV, raising=False)
+
+        assert runners.plan_for(stack).image == expected
+        assert expected.startswith("ghcr.io/thealphaengineercode/")
+
+    def test_images_can_be_pointed_elsewhere(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A fork, a mirror or an install with no route to ghcr needs its own."""
+        monkeypatch.setenv(runners.PYTHON_IMAGE_ENV, "registry.internal/py:1")
+        monkeypatch.setenv(runners.NODE_IMAGE_ENV, "registry.internal/node:1")
+
+        assert runners.plan_for("pytest").image == "registry.internal/py:1"
+        assert runners.plan_for("vitest").image == "registry.internal/node:1"
+
+    def test_a_blank_override_is_not_an_image(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Deployments set variables to empty far more often than they unset them."""
+        monkeypatch.setenv(runners.PYTHON_IMAGE_ENV, "   ")
+
+        assert runners.plan_for("pytest").image == runners.DEFAULT_PYTHON_IMAGE
+
+    def test_benchmarks_run_in_the_same_python_image(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv(runners.PYTHON_IMAGE_ENV, "registry.internal/py:1")
+        write(tmp_path, "pyproject.toml", '[project]\nname="x"\ndependencies=["pytest-benchmark"]')
+
+        assert runners.benchmark_plan_for(tmp_path).image == "registry.internal/py:1"

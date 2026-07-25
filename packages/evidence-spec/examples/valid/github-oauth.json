@@ -19,7 +19,7 @@
   "environment": {
     "runnerVersion": "0.1.0",
     "operatingSystem": "linux",
-    "containerImage": "ghcr.io/proofforge/sandbox-node@sha256:deadbeef",
+    "containerImage": "ghcr.io/thealphaengineercode/proofforge-sandbox-node@sha256:deadbeef",
     "runtimeVersions": {
       "node": "20.11.0",
       "pnpm": "9.15.0"
@@ -164,7 +164,7 @@
     }
   ],
   "artifacts": [],
-  "evidenceHash": "sha256:314447da7e1a9457e087eedd2be03c31c7dcd1235131b7cdd0a26979129bc6a9",
+  "evidenceHash": "sha256:d4c476170d3acc03cefd4db518e0c52909914ffafdd3db038710cf53f7f03ba5",
   "signature": {
     "algorithm": "ed25519",
     "publicKeyId": "",

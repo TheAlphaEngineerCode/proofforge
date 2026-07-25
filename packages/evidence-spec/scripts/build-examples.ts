@@ -33,7 +33,7 @@ const input: ManifestInput = {
   environment: {
     runnerVersion: "0.1.0",
     operatingSystem: "linux",
-    containerImage: "ghcr.io/proofforge/sandbox-node@sha256:deadbeef",
+    containerImage: "ghcr.io/thealphaengineercode/proofforge-sandbox-node@sha256:deadbeef",
     runtimeVersions: { node: "20.11.0", pnpm: "9.15.0" },
     dependencyLockHashes: { "pnpm-lock.yaml": "sha256:aa11bb22" },
   },

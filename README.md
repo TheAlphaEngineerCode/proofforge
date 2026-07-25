@@ -95,7 +95,7 @@ make test         # run the test suite
 
 ### Produce a manifest from a repository
 
-Builds the sandbox image on first use, runs the repository's tests inside it, and writes an
+Pulls the sandbox image on first use, runs the repository's tests inside it, and writes an
 evidence bundle:
 
 ```bash
@@ -106,6 +106,12 @@ uv run proofforge-evidence build \
   --commit <sha> --base <sha> --branch main \
   --output-dir ./bundle
 ```
+
+The images are published from this repository and can be replaced with your own —
+see [docs/sandbox-images.md](./docs/sandbox-images.md). Without Docker the test
+collector reports `unavailable`, and with an image it cannot pull, `error`. Either
+way the risk score charges for the unmeasured signal instead of letting the change
+pass.
 
 ### Sign the manifest
 

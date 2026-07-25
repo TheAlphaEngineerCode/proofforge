@@ -5,7 +5,7 @@ SHELL := /bin/sh
 .DEFAULT_GOAL := help
 
 .PHONY: help setup dev build test test-coverage lint typecheck format \
-        docker-up docker-down docker-logs clean db-migrate db-reset
+        docker-up docker-down docker-logs sandbox-images clean db-migrate db-reset
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -44,6 +44,12 @@ docker-down: ## Stop local infra
 
 docker-logs: ## Tail infra logs
 	docker compose logs -f
+
+sandbox-images: ## Build the sandbox images locally, under the names the runner pulls
+	docker build -f infrastructure/docker/sandbox-python.Dockerfile \
+		-t ghcr.io/thealphaengineercode/proofforge-sandbox-python:3.12 infrastructure/docker
+	docker build -f infrastructure/docker/sandbox-node.Dockerfile \
+		-t ghcr.io/thealphaengineercode/proofforge-sandbox-node:20 infrastructure/docker
 
 db-migrate: ## Apply the database schema to DATABASE_URL
 	pnpm --filter @proofforge/database db:migrate

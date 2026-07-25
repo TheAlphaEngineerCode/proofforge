@@ -2,10 +2,12 @@ from pathlib import Path
 
 from proofforge_evidence.sandbox import Mount, SandboxSpec, build_docker_command
 
+IMAGE = "ghcr.io/thealphaengineercode/proofforge-sandbox-node:latest"
+
 
 def _spec(**kwargs: object) -> SandboxSpec:
     base = {
-        "image": "ghcr.io/proofforge/sandbox-node:latest",
+        "image": IMAGE,
         "command": ["pytest", "-q"],
     }
     base.update(kwargs)
@@ -25,7 +27,7 @@ def test_command_applies_security_hardening() -> None:
     assert "--cap-drop ALL" in joined
     assert "--security-opt no-new-privileges" in joined
     # the command is appended last, after the image
-    assert cmd[-3:] == ["ghcr.io/proofforge/sandbox-node:latest", "pytest", "-q"]
+    assert cmd[-3:] == [IMAGE, "pytest", "-q"]
 
 
 def test_network_opt_in_switches_to_bridge() -> None:

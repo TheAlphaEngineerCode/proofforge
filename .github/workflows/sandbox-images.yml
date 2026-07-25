@@ -1,0 +1,118 @@
+name: Sandbox images
+
+# The sandbox images are the only place a repository's own tests are allowed to
+# run, so an evidence bundle without them can never carry a test result — the
+# collector reports `timeout` and the risk score charges for the missing signal.
+# They were never published, which is why every deployed run said exactly that.
+#
+# Weekly rebuilds are deliberate: the images pin `node:20-slim` and
+# `python:3.12-slim`, and a fix in a base image reaches the sandbox only when
+# something rebuilds on top of it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infrastructure/docker/sandbox-*.Dockerfile"
+      - ".github/workflows/sandbox-images.yml"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: sandbox-images
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: ${{ matrix.stack }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - stack: python
+            tag: "3.12"
+          - stack: node
+            tag: "20"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Work out the image name
+        id: image
+        env:
+          OWNER: ${{ github.repository_owner }}
+          STACK: ${{ matrix.stack }}
+        # ghcr rejects an uppercase path, and the account name has capitals.
+        run: echo "name=ghcr.io/${OWNER,,}/proofforge-sandbox-$STACK" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: infrastructure/docker
+          file: infrastructure/docker/sandbox-${{ matrix.stack }}.Dockerfile
+          # Loaded rather than pushed, so the checks below run against the image
+          # that would ship, and a broken one is never published.
+          load: true
+          tags: ${{ steps.image.outputs.name }}:${{ matrix.tag }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=ProofForge sandbox for running a repository's tests
+            org.opencontainers.image.licenses=Apache-2.0
+          cache-from: type=gha,scope=sandbox-${{ matrix.stack }}
+          cache-to: type=gha,mode=max,scope=sandbox-${{ matrix.stack }}
+
+      - name: Check the image can do what the runner asks of it
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}:${{ matrix.tag }}
+          STACK: ${{ matrix.stack }}
+        # Mirror how the sandbox actually invokes the image: uid 10001, read-only
+        # root, /work an anonymous volume and /out a bind mount from the host.
+        # /out has to be a bind mount here and not a volume — a volume inherits
+        # the image's ownership and would pass regardless, while a bind mount
+        # keeps the host directory's, which is the case that really bites. An
+        # image running as anyone else, or missing the reporter, otherwise shows
+        # up only as an empty bundle nobody traces back to here.
+        run: |
+          set -euo pipefail
+          test "$(docker run --rm "$IMAGE" 'id -u')" = "10001"
+
+          mkdir -p out
+          sudo chown 10001:10001 out
+          docker run --rm --user 10001:10001 --read-only --tmpfs /tmp:rw \
+            --volume /work --volume "$PWD/out:/out" --env HOME=/work "$IMAGE" \
+            'touch /out/probe && test -w /work'
+          test -f out/probe  # the collector reads it from the host, not the container
+
+          if [ "$STACK" = "python" ]; then
+            docker run --rm "$IMAGE" 'python -m pytest --version && python -m coverage --version && uv --version'
+          else
+            docker run --rm "$IMAGE" 'node --version && pnpm --version'
+          fi
+
+      - name: Sign in to ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          TAG: ${{ matrix.tag }}
+          SHA: ${{ github.sha }}
+        # Two tags: the one the runner pulls, and the commit that produced it, so
+        # a bundle can be traced back to an exact build.
+        run: |
+          set -euo pipefail
+          docker tag "$IMAGE:$TAG" "$IMAGE:$SHA"
+          docker push "$IMAGE:$TAG"
+          docker push "$IMAGE:$SHA"
