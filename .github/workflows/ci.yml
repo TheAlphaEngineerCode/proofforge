@@ -179,6 +179,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Gitleaks scans the range a push introduced, which means resolving the
+          # parent of its first commit. The default shallow checkout does not have
+          # it, so any push carrying more than one commit fails on a git error
+          # rather than on a finding — a secret scanner that goes red for reasons
+          # unrelated to secrets is one people learn to wave through.
+          fetch-depth: 0
 
       - name: Gitleaks (secret scan)
         uses: gitleaks/gitleaks-action@v3
