@@ -38,6 +38,13 @@ const ConfigSchema = z.object({
   pipelineStepMs: z.coerce.number().int().nonnegative().default(400),
 
   /**
+   * Bearer token the /metrics scrape has to present. The series there name the
+   * repositories this deployment analyses, so in production the endpoint is
+   * served only when a token is configured — see {@link metricsRoutes}.
+   */
+  metricsToken: z.string().default(""),
+
+  /**
    * Path to services/evidence-engine. When set, analyses check the commit out and
    * collect real evidence; otherwise a simulated manifest is produced.
    */
@@ -76,6 +83,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     devLogin: env.AUTH_DEV_LOGIN,
     webOrigin: env.WEB_BASE_URL,
     pipelineStepMs: env.PIPELINE_STEP_MS,
+    metricsToken: env.METRICS_TOKEN,
     evidenceEngineDir: env.EVIDENCE_ENGINE_DIR,
     githubAppId: env.GITHUB_APP_ID,
     // A PEM cannot survive a single-line .env unless its newlines are escaped,

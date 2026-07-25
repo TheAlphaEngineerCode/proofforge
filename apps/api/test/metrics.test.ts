@@ -68,3 +68,40 @@ describe("the metrics endpoint", () => {
     expect((await ctx.app.inject({ url: "/metrics" })).body).toBe("");
   });
 });
+
+/**
+ * Who may read it. The labels name the repositories a deployment analyses, so
+ * the endpoint is open only where the deployment says it is safe to be open.
+ */
+describe("the metrics endpoint — access", () => {
+  it("turns a scrape away when it presents the wrong token, or none", async () => {
+    const ctx = await setup({ METRICS_TOKEN: "s3cret" });
+
+    expect((await ctx.app.inject({ url: "/metrics" })).statusCode).toBe(401);
+    expect(
+      (await ctx.app.inject({ url: "/metrics", headers: auth("wrong") })).statusCode,
+    ).toBe(401);
+
+    await ctx.app.close();
+  });
+
+  it("serves the scrape that presents the token", async () => {
+    const ctx = await setup({ METRICS_TOKEN: "s3cret" });
+
+    const res = await ctx.app.inject({ url: "/metrics", headers: auth("s3cret") });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toContain("text/plain");
+    await ctx.app.close();
+  });
+
+  it("is not served at all in production when no token is configured", async () => {
+    // Absent rather than open: an unconfigured production deployment should not
+    // publish its repository names to whoever finds the port.
+    const ctx = await setup({ NODE_ENV: "production" });
+
+    expect((await ctx.app.inject({ url: "/metrics" })).statusCode).toBe(404);
+
+    await ctx.app.close();
+  });
+});

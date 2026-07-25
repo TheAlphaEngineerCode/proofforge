@@ -5,6 +5,9 @@ import { getOwnedAnalysis } from "../access.js";
 import { unauthorized } from "../errors.js";
 import { requireUser } from "../plugins/auth.js";
 
+/** Comfortably inside the 60s idle timeout most proxies default to. */
+const HEARTBEAT_MS = 20_000;
+
 export function analysisRoutes(app: FastifyInstance, deps: AppDeps): void {
   app.get("/api/v1/analyses/:id", async (request) => {
     const user = requireUser(request);
@@ -27,10 +30,18 @@ export function analysisRoutes(app: FastifyInstance, deps: AppDeps): void {
       Connection: "keep-alive",
       "Access-Control-Allow-Origin": deps.config.webOrigin,
     });
-    raw.write(": connected\n\n");
+    // Writing to a socket the client already dropped does not throw — it raises
+    // an error event, and an unhandled one on a hijacked reply takes the process
+    // with it. The close handler below tears the stream down, but it cannot win
+    // every race against a timer or an event that is already in flight.
+    const write = (chunk: string): void => {
+      if (!raw.destroyed) raw.write(chunk);
+    };
+
+    write(": connected\n\n");
 
     const send = (event: AnalysisEvent): void => {
-      raw.write(`data: ${JSON.stringify(event)}\n\n`);
+      write(`data: ${JSON.stringify(event)}\n\n`);
     };
 
     // Immediately emit the current status so late subscribers are in sync.
@@ -43,11 +54,26 @@ export function analysisRoutes(app: FastifyInstance, deps: AppDeps): void {
       at: new Date().toISOString(),
     });
 
+    // An analysis can sit in one step for minutes, and a stream with nothing on
+    // it looks identical to a dead one: proxies and hosting tiers close idle
+    // connections, and the browser only learns about it when it reconnects. A
+    // comment line keeps the connection accountable without being an event.
+    const heartbeat = setInterval(() => write(": ping\n\n"), HEARTBEAT_MS);
+    heartbeat.unref();
+
     const unsubscribe = deps.events.subscribe(id, send);
-    request.raw.on("close", () => {
+    const release = (): void => {
+      clearInterval(heartbeat);
       unsubscribe();
+    };
+
+    request.raw.on("close", () => {
+      release();
       raw.end();
     });
+    // A socket that fails outright never reports a clean close, and a timer left
+    // running on it would keep firing at a stream nobody is reading.
+    raw.on("error", release);
   });
 }
 

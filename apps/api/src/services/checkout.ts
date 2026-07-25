@@ -11,6 +11,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import { COMMIT_SHA } from "@proofforge/shared-types";
 
 const run = promisify(execFile);
 
@@ -47,6 +48,14 @@ export class GitRepositoryCheckout implements RepositoryCheckout {
   }
 
   async fetch(request: CheckoutRequest): Promise<Checkout> {
+    // The commit is passed to git as a positional argument, where a value
+    // beginning with `-` would be read as an option instead of a ref. Callers
+    // validate their own input, but this is the boundary the argument actually
+    // crosses, so it is the boundary that has to hold.
+    if (!COMMIT_SHA.test(request.commitSha)) {
+      throw new Error(`checkout refused: "${request.commitSha}" is not a git object name`);
+    }
+
     const dir = await mkdtemp(join(tmpdir(), "proofforge-src-"));
     const dispose = async (): Promise<void> => {
       await rm(dir, { recursive: true, force: true }).catch(() => undefined);

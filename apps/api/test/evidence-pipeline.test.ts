@@ -3,7 +3,12 @@ import type { Manifest } from "@proofforge/evidence-spec";
 import { describe, expect, it, vi } from "vitest";
 import { EventBus } from "../src/events.js";
 import { AnalysisRunner, type EvidencePipeline } from "../src/services/analysis-runner.js";
-import type { Checkout, CheckoutRequest, RepositoryCheckout } from "../src/services/checkout.js";
+import {
+  GitRepositoryCheckout,
+  type Checkout,
+  type CheckoutRequest,
+  type RepositoryCheckout,
+} from "../src/services/checkout.js";
 import type { EvidenceProducer, EvidenceRequest } from "../src/services/evidence-producer.js";
 import { buildAnalysisManifest } from "../src/manifest.js";
 import { createMetrics } from "../src/observability.js";
@@ -177,5 +182,23 @@ describe("evidence pipeline wiring", () => {
 
     const logged = warn.mock.calls.map((call) => String(call[0])).join("\n");
     expect(logged).not.toContain("ghs_supersecret");
+  });
+});
+
+describe("the git checkout", () => {
+  // The runner validates at the API boundary, but this class is what hands the
+  // value to git — so it refuses on its own, whoever calls it. A rejected commit
+  // must never reach a subprocess, which is why no git binary is needed here.
+  it.each([
+    ["--upload-pack=touch /tmp/pwned"],
+    ["--exec=whoami"],
+    ["refs/heads/main"],
+    [""],
+  ])("refuses to fetch %j", async (commitSha) => {
+    const checkout = new GitRepositoryCheckout();
+
+    await expect(
+      checkout.fetch({ owner: "acme", repo: "api", commitSha }),
+    ).rejects.toThrow(/not a git object name/);
   });
 });

@@ -12,6 +12,7 @@ export {
 } from "./states.js";
 
 export {
+  COMMIT_SHA,
   RiskLevel,
   User,
   Organization,

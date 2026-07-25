@@ -9,7 +9,7 @@
 import { costUsd } from "./pricing.js";
 import type { AiProvider, CompletionRequest, CompletionResult, StopReason } from "./types.js";
 
-export const DEFAULT_MODEL = "claude-opus-4-8";
+export const DEFAULT_MODEL = "claude-opus-5";
 
 /**
  * The slice of the SDK we use. Narrowing it here keeps the tests honest — they

@@ -13,6 +13,7 @@ export interface Rate {
 }
 
 export const RATES: Readonly<Record<string, Rate>> = {
+  "claude-opus-5": { inputPerMTok: 5.0, outputPerMTok: 25.0 },
   "claude-opus-4-8": { inputPerMTok: 5.0, outputPerMTok: 25.0 },
   "claude-opus-4-7": { inputPerMTok: 5.0, outputPerMTok: 25.0 },
   "claude-sonnet-5": { inputPerMTok: 3.0, outputPerMTok: 15.0 },

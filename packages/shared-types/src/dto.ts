@@ -81,6 +81,23 @@ export type Policy = z.infer<typeof Policy>;
 
 // ── request bodies ───────────────────────────────────────────────────────────
 
+/**
+ * What GitHub itself allows, and no more.
+ *
+ * These three are stored, but they are also read back out to build the remote URL
+ * and the ref of a `git fetch` — so whoever supplies them is writing part of a
+ * command line. Nothing is spawned through a shell, but git still reads an
+ * argument beginning with `-` as an option rather than a ref.
+ *
+ * The commit is held to a hexadecimal sha for a second reason. Evidence is bound
+ * to a commit, and a manifest whose `commit` is a string nobody can resolve makes
+ * a provenance claim that cannot be checked — which is the one thing this project
+ * exists to prevent.
+ */
+const OWNER = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+const REPO_NAME = /^[A-Za-z0-9._-]{1,100}$/;
+export const COMMIT_SHA = /^[0-9a-f]{7,40}$/;
+
 export const CreateOrganizationInput = z.object({
   name: z.string().min(1).max(100),
   slug: z
@@ -93,16 +110,16 @@ export type CreateOrganizationInput = z.infer<typeof CreateOrganizationInput>;
 
 export const CreateRepositoryInput = z.object({
   organizationId: z.string().uuid(),
-  owner: z.string().min(1),
-  name: z.string().min(1),
-  defaultBranch: z.string().min(1).default("main"),
+  owner: z.string().regex(OWNER, "owner must be a GitHub account name"),
+  name: z.string().regex(REPO_NAME, "name must be a GitHub repository name"),
+  defaultBranch: z.string().min(1).max(255).default("main"),
   language: z.string().nullable().default(null),
   private: z.boolean().default(false),
 });
 export type CreateRepositoryInput = z.infer<typeof CreateRepositoryInput>;
 
 export const CreateAnalysisInput = z.object({
-  commitSha: z.string().min(7),
+  commitSha: z.string().regex(COMMIT_SHA, "commitSha must be a hexadecimal git object name"),
 });
 export type CreateAnalysisInput = z.infer<typeof CreateAnalysisInput>;
 

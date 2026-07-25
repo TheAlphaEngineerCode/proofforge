@@ -3,8 +3,8 @@
  *
  * A preHandler resolves the session user (if any) onto `request.user`. Routes
  * that require a user call {@link requireUser}, which throws 401 when absent.
- * GitHub OAuth (Phase 5) will issue the same session tokens; the dev-login route
- * issues them locally.
+ * GitHub OAuth and the dev-login route issue the same session tokens; which of
+ * the two a deployment offers is a matter of configuration, not of this plugin.
  */
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { User } from "@proofforge/shared-types";
@@ -17,7 +17,8 @@ declare module "fastify" {
   }
 }
 
-function extractToken(request: FastifyRequest): string | null {
+/** The bearer token on a request, or null if there isn't a well-formed one. */
+export function bearerToken(request: FastifyRequest): string | null {
   const header = request.headers.authorization;
   if (!header) return null;
   const [scheme, token] = header.split(" ");
@@ -29,7 +30,7 @@ export function registerAuth(app: FastifyInstance, storage: Storage): void {
   app.decorateRequest("user", null);
 
   app.addHook("preHandler", async (request) => {
-    const token = extractToken(request);
+    const token = bearerToken(request);
     request.user = token ? await storage.getSessionUser(token) : null;
   });
 }
