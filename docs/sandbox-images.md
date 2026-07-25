@@ -57,27 +57,35 @@ rejects an uppercase path), so a fork publishes to its own namespace without
 editing the workflow. Pointing a fork's *runner* at those images is a separate
 step — the two environment variables below.
 
-### Make the package public, once
+### Check that the package is public
 
-A package pushed by `GITHUB_TOKEN` is **private by default**. The runner pulls
-anonymously, and a private image fails the pull exactly like a missing one: the
-collector reports `error` either way, and only the registry's message inside the
-detail tells the two apart.
+The runner pulls anonymously, so an image nobody can read without credentials
+fails exactly like an image that does not exist — the collector reports `error`
+either way, and only the registry's message in the detail tells them apart. It is
+worth confirming rather than assuming, since it is invisible until an analysis
+quietly stops producing test results.
 
-After the first successful publish, open the package on GitHub → *Package
-settings* → *Change visibility* → **Public**, for each of the two. It is a
-one-time step per package; later pushes keep the visibility.
+Published from this public repository, both packages came out public on their own
+and needed no visibility change. That inherits from the repository, so publishing
+the same images from a private fork would not.
+
+Confirm without credentials — no Docker or login required:
+
+```sh
+name=thealphaengineercode/proofforge-sandbox-python
+token=$(curl -s "https://ghcr.io/token?scope=repository:$name:pull&service=ghcr.io" \
+  | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+curl -sI -H "Authorization: Bearer $token" "https://ghcr.io/v2/$name/manifests/3.12" | head -1
+```
+
+`200` means anonymous pulls work. Anything else means they do not: open the
+package on GitHub → *Package settings* → *Change visibility* → **Public**. That
+is a one-time step per package; later pushes keep the visibility.
 
 If the push itself fails with a 403 before you get that far, the repository's
 *Settings → Actions → General → Workflow permissions* is the place to look — the
 `permissions:` block in the workflow cannot grant the token more than the
 repository allows it to have.
-
-Verify from a machine that is not logged in:
-
-```sh
-docker pull ghcr.io/thealphaengineercode/proofforge-sandbox-python:3.12
-```
 
 ## Pointing somewhere else
 
