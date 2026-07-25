@@ -87,12 +87,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Through the same runner the API uses on startup, not a parallel psql
+      # invocation: a schema applied one way and tested another proves nothing
+      # about how production actually gets its tables.
       - name: Apply the schema
         env:
-          PGPASSWORD: proofforge
-        run: |
-          psql -h localhost -U postgres -d proofforge \
-            -f packages/database/migrations/0000_fine_morbius.sql
+          DATABASE_URL: postgresql://postgres:proofforge@localhost:5432/proofforge
+        run: pnpm --filter @proofforge/database db:migrate
+
+      - name: Apply it again, to prove it is a no-op
+        env:
+          DATABASE_URL: postgresql://postgres:proofforge@localhost:5432/proofforge
+        run: pnpm --filter @proofforge/database db:migrate
 
       - name: Run the storage tests against PostgreSQL
         env:

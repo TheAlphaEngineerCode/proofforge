@@ -45,8 +45,8 @@ docker-down: ## Stop local infra
 docker-logs: ## Tail infra logs
 	docker compose logs -f
 
-db-migrate: ## Run database migrations (Phase 4)
-	@echo "Migrations land in Phase 4 (packages/database)."
+db-migrate: ## Apply the database schema to DATABASE_URL
+	pnpm --filter @proofforge/database db:migrate
 
 db-reset: ## Reset the database (Phase 4)
 	@echo "DB reset lands in Phase 4 (packages/database)."

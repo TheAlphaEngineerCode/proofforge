@@ -3,6 +3,7 @@
  */
 export * as schema from "./schema.js";
 export { createDbClient, type Database } from "./client.js";
+export { migrate, defaultMigrationsDir, type MigrationResult } from "./migrate.js";
 export { InMemoryStorage } from "./memory.js";
 export { DrizzleStorage } from "./drizzle-storage.js";
 export type {

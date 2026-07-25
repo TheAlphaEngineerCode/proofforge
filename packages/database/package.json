@@ -21,6 +21,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/migrate-cli.ts",
     "clean": "rimraf dist coverage .turbo"
   },
   "dependencies": {
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.1",
+    "tsx": "^4.19.2",
     "tsup": "^8.3.5",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
