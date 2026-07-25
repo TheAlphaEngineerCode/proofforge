@@ -44,9 +44,11 @@ CPU/memory/PID limits, read-only rootfs, `--cap-drop ALL`) — repository code n
 the host.
 
 **Done when:** execution is isolated, a manifest is generated and cross-language verified,
-evidence is persisted, failures/unavailable tools are reported cleanly. ✅ (Wiring concrete
-per-stack sandbox runner images for test execution is the remaining integration step; the
-hardened sandbox command builder is implemented and unit-tested.)
+evidence is persisted, failures/unavailable tools are reported cleanly. ✅ (The per-stack
+runner images are built, hardened-checked and published by `sandbox-images.yml` to
+`ghcr.io/thealphaengineercode/proofforge-sandbox-{python,node}`, which the runner pulls by
+default and either image can be overridden by env var — see
+[docs/sandbox-images.md](./docs/sandbox-images.md).)
 
 ## Phase 4 — API & Dashboard ✅
 
@@ -145,8 +147,11 @@ in-memory backend keeps every other test hermetic; a Redis integration job and a
 distributed test (enqueue in one instance, run in a worker, events bridged back) run against a
 real server. Metrics from Observability already count per-collector provenance across all runs.
 
-**Remaining:** container images for the API and worker, Kubernetes manifests and a Helm chart
-(8b), and distributed tracing across the enqueue/run boundary now that it spans processes (8c).
+**Remaining (8b):** the API and worker images build on every change in CI, which is what keeps
+a dependency added to an app but not to its Dockerfile from reaching a deploy — but nothing
+publishes them, and there are no Kubernetes manifests or Helm chart (`infrastructure/` holds
+only `docker/`). **Remaining (8c):** distributed tracing across the enqueue/run boundary, now
+that it spans processes.
 
 ## Phase 9 — SDK & plugins ⬜
 

@@ -184,9 +184,28 @@ in-memory storage and says so in the logs; nothing is persisted across a restart
 pointing it at a different API means rebuilding the image, not restarting the container.
 
 [`render.yaml`](./render.yaml) is a Render blueprint for both services plus PostgreSQL.
-Unlike the Dockerfiles, it has never been deployed — treat the first deploy as its test.
 `WEB_BASE_URL` and `NEXT_PUBLIC_API_URL` are prompted for rather than wired between services,
-because Render can only supply a bare hostname and both values need the scheme.
+because Render can only supply a bare hostname and both values need the scheme. The blueprint
+itself is still unproven: the instance below was created service by service rather than from
+this file, which declares paid plans and neither Redis nor a worker.
+
+### A public instance is running, and it cannot produce real evidence
+
+- Dashboard — <https://proofforge-web.onrender.com>
+- API — <https://proofforge-api-ri67.onrender.com> (`/health`, `/api/v1/auth/config`)
+
+Deployed on 2026-07-24, with GitHub sign-in wired up. It demonstrates the flow —
+repositories, analyses, the manifest view — and **every manifest it produces is
+simulated**. Three independent reasons, any one of which would be enough: the deployment
+leaves `EVIDENCE_ENGINE_DIR` unset, and without it the pipeline is never wired
+([`factory.ts`](./apps/api/src/factory.ts)); the API image carries no Python or uv, so there
+would be nothing to run if it were set; and a Render web service has no Docker daemon, so
+the sandbox could not start either. Real evidence needs a host with Docker — self-hosted,
+or CI.
+
+It runs on Render's free plan, which shows: the services hibernate after roughly 15 idle
+minutes, so the first request takes about 50 seconds, and the free PostgreSQL expires
+around 2026-08-23.
 
 ## Test execution
 
@@ -258,8 +277,9 @@ already prove things. Full plan in [ROADMAP.md](./ROADMAP.md).
 - **Phase 6** — Risk & Policy engines ✅
 - **Phase 7** — AI agents (provider-neutral) ✅
 - **Observability** — structured logs, metrics at `/metrics` ✅
-- **Phase 8** — Distributed workers 🚧 (queue, workers and cross-process events done; images,
-  Kubernetes/Helm and tracing remain)
+- **Phase 8** — Distributed workers 🚧 (queue, workers and cross-process events done; the API
+  and worker images build on every change in CI but are not published anywhere; Kubernetes/Helm
+  and tracing remain)
 - **Phase 9** — SDK & plugins
 
 ### What Phase 7 contains, and what it has been through

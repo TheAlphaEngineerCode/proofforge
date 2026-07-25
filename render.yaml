@@ -1,8 +1,10 @@
 # Render blueprint.
 #
-# Unlike the Dockerfiles, this file has not been deployed — it is a starting
-# point written against Render's blueprint spec, not something proven to boot.
-# Treat the first deploy as the test.
+# ProofForge does run on Render (since 2026-07-24), but not from this file: the
+# services were created one by one, so the blueprint itself is still unproven —
+# treat the first blueprint deploy as its test. It also does not describe what is
+# running, which is on free plans with neither Redis nor a worker, so the API
+# executes analyses in-process.
 #
 # Secrets are declared with `sync: false` so Render prompts for them rather than
 # reading them from this file; nothing here should ever hold a credential.
