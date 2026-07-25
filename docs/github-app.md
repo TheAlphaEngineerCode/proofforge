@@ -94,6 +94,35 @@ are still authenticated and recorded, but nothing is published back to GitHub. W
 `GITHUB_WEBHOOK_SECRET` the endpoint returns `503` — it never accepts unauthenticated
 deliveries.
 
+## Connecting an installation to an organization
+
+Installing the App tells GitHub to start delivering; it does not say which
+ProofForge organization those deliveries belong to. Until someone connects it,
+every delivery is acknowledged and ignored, with
+`installation is not connected to an organization` as the reason.
+
+```bash
+curl -X POST "$API_BASE_URL/api/v1/github/installations/<installation_id>/claim" \
+  -H "authorization: Bearer <session token>" \
+  -H "content-type: application/json" \
+  -d '{"organizationId":"<org uuid>"}'
+```
+
+The claim is granted only to the GitHub account that performed the installation.
+That account is taken from the `sender` of the `installation` event — a body
+GitHub signed — and never from the caller, because installation ids are small
+consecutive integers and anything self-asserted would be trivially guessable.
+
+Two consequences worth knowing:
+
+- Sign in with **GitHub**, not dev-login. A dev-login session has no GitHub
+  identity and so can never satisfy the check.
+- An installation created **before this tracking existed** has no recorded
+  installer. GitHub does not redeliver the original `installation` event, so
+  there is nothing to check against and the App has to be uninstalled and
+  installed again. The API says so explicitly rather than returning a bare
+  "forbidden".
+
 ## Signing people in
 
 The same App also authenticates *users*. A GitHub App carries its own OAuth

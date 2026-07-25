@@ -112,6 +112,11 @@ export class InMemoryStorage implements Storage {
   }
 
   async createRepository(input: NewRepository): Promise<Repository> {
+    const duplicate = await this.findRepository(input.organizationId, input.owner, input.name);
+    if (duplicate) {
+      throw new Error(`repository already registered: ${input.owner}/${input.name}`);
+    }
+
     const repo: Repository = {
       id: randomUUID(),
       organizationId: input.organizationId,
@@ -134,9 +139,15 @@ export class InMemoryStorage implements Storage {
     return this.repositories.get(id) ?? null;
   }
 
-  async findRepositoryByFullName(owner: string, name: string): Promise<Repository | null> {
+  async findRepository(
+    organizationId: string,
+    owner: string,
+    name: string,
+  ): Promise<Repository | null> {
     for (const repo of this.repositories.values()) {
-      if (repo.owner === owner && repo.name === name) return repo;
+      if (repo.organizationId === organizationId && repo.owner === owner && repo.name === name) {
+        return repo;
+      }
     }
     return null;
   }
@@ -147,6 +158,10 @@ export class InMemoryStorage implements Storage {
       id: existing?.id ?? randomUUID(),
       githubInstallationId: input.githubInstallationId,
       accountLogin: input.accountLogin ?? existing?.accountLogin ?? null,
+      // A later delivery must not silently move an installation to another
+      // tenant, nor rewrite who installed it — both are decided once.
+      organizationId: existing?.organizationId ?? null,
+      installedBy: existing?.installedBy ?? input.installedBy ?? null,
       suspended: input.suspended ?? existing?.suspended ?? false,
       createdAt: existing?.createdAt ?? this.now(),
     };
@@ -158,11 +173,33 @@ export class InMemoryStorage implements Storage {
     return this.installations.get(githubInstallationId) ?? null;
   }
 
+  async claimInstallation(
+    githubInstallationId: number,
+    organizationId: string,
+  ): Promise<Installation> {
+    const existing = this.installations.get(githubInstallationId);
+    if (!existing) throw new Error(`installation not found: ${githubInstallationId}`);
+
+    const claimed: Installation = { ...existing, organizationId };
+    this.installations.set(githubInstallationId, claimed);
+    return claimed;
+  }
+
   async deleteInstallation(githubInstallationId: number): Promise<void> {
     this.installations.delete(githubInstallationId);
   }
 
   async createAnalysis(input: NewAnalysis): Promise<Analysis> {
+    // The same constraint Postgres carries. Tests run against this store, and a
+    // store that accepts what production rejects would let a duplicate look
+    // legal here and fail only once deployed.
+    const duplicate = await this.findAnalysisByCommit(input.repositoryId, input.commitSha);
+    if (duplicate) {
+      throw new Error(
+        `analysis already exists for ${input.repositoryId} at ${input.commitSha}`,
+      );
+    }
+
     const timestamp = this.now();
     const analysis: Analysis = {
       id: randomUUID(),
@@ -200,6 +237,15 @@ export class InMemoryStorage implements Storage {
     return [...this.analyses.values()]
       .filter((a) => a.repositoryId === repositoryId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async findAnalysisByCommit(repositoryId: string, commitSha: string): Promise<Analysis | null> {
+    for (const analysis of this.analyses.values()) {
+      if (analysis.repositoryId === repositoryId && analysis.commitSha === commitSha) {
+        return analysis;
+      }
+    }
+    return null;
   }
 
   async createEvidenceBundle(input: NewEvidenceBundle): Promise<EvidenceBundle> {

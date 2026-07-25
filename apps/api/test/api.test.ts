@@ -137,4 +137,90 @@ describe("analysis pipeline", () => {
     expect(result.valid).toBe(true);
     expect(result.hash?.valid).toBe(true);
   });
+
+  // These two values become the ref and the remote of a `git fetch`, so the
+  // interesting case is not a typo — it is an argument dressed as a commit.
+  it.each([
+    ["an option rather than a ref", "--upload-pack=touch /tmp/pwned"],
+    ["a branch name", "refs/heads/main"],
+    ["a sha with a non-hex character", "9c82fd1a2b3c4d5e6f708192a3b4c5d6e7f8091z"],
+    ["too short to identify a commit", "9c82fd"],
+  ])("refuses a commit that is %s", async (_case, commitSha) => {
+    const { token } = await login(ctx.app);
+    const repoId = await connectedRepo(token);
+
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/repositories/${repoId}/analyze`,
+      headers: auth(token),
+      payload: { commitSha },
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(await ctx.deps.storage.listAnalyses(repoId)).toHaveLength(0);
+  });
+
+  it("refuses a repository whose owner is not a GitHub account name", async () => {
+    const { token } = await login(ctx.app);
+    const org = (
+      await ctx.app.inject({
+        method: "POST",
+        url: "/api/v1/organizations",
+        headers: auth(token),
+        payload: { name: "Acme", slug: "acme" },
+      })
+    ).json() as { id: string };
+
+    const res = await ctx.app.inject({
+      method: "POST",
+      url: "/api/v1/repositories",
+      headers: auth(token),
+      payload: { organizationId: org.id, owner: "acme@evil.example/x", name: "api" },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+});
+
+describe("asking for the same analysis twice", () => {
+  it("hands back the analysis that already covers the commit", async () => {
+    const { token } = await login(ctx.app);
+    const org = (
+      await ctx.app.inject({
+        method: "POST",
+        url: "/api/v1/organizations",
+        headers: auth(token),
+        payload: { name: "Acme", slug: "acme" },
+      })
+    ).json() as { id: string };
+    const repo = (
+      await ctx.app.inject({
+        method: "POST",
+        url: "/api/v1/repositories",
+        headers: auth(token),
+        payload: { organizationId: org.id, owner: "acme", name: "api" },
+      })
+    ).json() as { id: string };
+
+    const payload = { commitSha: "9c82fd1a2b3c4d5e6f708192a3b4c5d6e7f80912" };
+    const first = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/repositories/${repo.id}/analyze`,
+      headers: auth(token),
+      payload,
+    });
+    const second = await ctx.app.inject({
+      method: "POST",
+      url: `/api/v1/repositories/${repo.id}/analyze`,
+      headers: auth(token),
+      payload,
+    });
+
+    expect(first.statusCode).toBe(202);
+    // Answered, not refused and not run a second time: evidence is bound to a
+    // commit, so a second bundle for one commit is the thing to avoid.
+    expect(second.statusCode).toBe(200);
+    expect((second.json() as { id: string }).id).toBe((first.json() as { id: string }).id);
+    expect(await ctx.deps.storage.listAnalyses(repo.id)).toHaveLength(1);
+  });
 });

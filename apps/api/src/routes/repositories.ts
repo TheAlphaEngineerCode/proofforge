@@ -42,6 +42,15 @@ export function repositoryRoutes(app: FastifyInstance, deps: AppDeps): void {
     const input = parse(CreateAnalysisInput, request.body ?? {});
     await getOwnedRepository(deps, user.id, id);
 
+    // One analysis per commit, which is the same rule the webhook follows and is
+    // now enforced by the database. Asking twice is not an error — it is a
+    // question already answered, so hand back the answer instead of a second run.
+    const existing = await deps.storage.findAnalysisByCommit(id, input.commitSha);
+    if (existing) {
+      void reply.status(200);
+      return existing;
+    }
+
     const analysis = await deps.storage.createAnalysis({
       repositoryId: id,
       commitSha: input.commitSha,
@@ -52,8 +61,7 @@ export function repositoryRoutes(app: FastifyInstance, deps: AppDeps): void {
     // become an unhandled rejection that takes the API down. The analysis stays
     // in its created state, visible as never having started.
     void deps.queue.enqueue({ analysisId: analysis.id }).catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[api] failed to enqueue analysis ${analysis.id}: ${message}`);
+      request.log.error({ err, analysisId: analysis.id }, "[api] failed to enqueue analysis");
     });
 
     void reply.status(202);

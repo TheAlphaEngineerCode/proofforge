@@ -50,13 +50,31 @@ afterEach(async () => {
   await ctx.app.close();
 });
 
-async function connectRepository(owner: string, name: string): Promise<string> {
-  const user = await ctx.deps.storage.createUser({ name: "u", email: "u@example.com" });
+/**
+ * A tenant as the product actually assembles one: an organization, an
+ * installation it has claimed, and a repository registered under it. Deliveries
+ * are routed by the installation, so a repository without one is unreachable —
+ * which is the point of the fixture rather than an accident of it.
+ */
+async function connectRepository(
+  owner: string,
+  name: string,
+  installationId = 987,
+): Promise<{ repositoryId: string; organizationId: string }> {
+  const user = await ctx.deps.storage.createUser({
+    name: "u",
+    email: `u+${owner}-${name}@example.com`,
+  });
   const org = await ctx.deps.storage.createOrganization({
-    name: "Acme",
-    slug: "acme",
+    name: owner,
+    slug: `${owner}-${name}`,
     ownerId: user.id,
   });
+  await ctx.deps.storage.upsertInstallation({
+    githubInstallationId: installationId,
+    accountLogin: owner,
+  });
+  await ctx.deps.storage.claimInstallation(installationId, org.id);
   const repo = await ctx.deps.storage.createRepository({
     organizationId: org.id,
     owner,
@@ -65,7 +83,7 @@ async function connectRepository(owner: string, name: string): Promise<string> {
     language: null,
     private: false,
   });
-  return repo.id;
+  return { repositoryId: repo.id, organizationId: org.id };
 }
 
 describe("github webhook — authentication", () => {
@@ -120,7 +138,7 @@ describe("github webhook — routing", () => {
   });
 
   it("is idempotent: a redelivered webhook reuses the same analysis", async () => {
-    await connectRepository("acme", "api");
+    const { repositoryId } = await connectRepository("acme", "api");
 
     const first = await ctx.app.inject(delivery("pull_request", pullRequestPayload()));
     const second = await ctx.app.inject(delivery("pull_request", pullRequestPayload()));
@@ -132,8 +150,7 @@ describe("github webhook — routing", () => {
     expect(secondBody.status).toBe("already_analyzed");
     expect(secondBody.analysisId).toBe(firstBody.analysisId);
 
-    const repoId = (await ctx.deps.storage.findRepositoryByFullName("acme", "api"))!.id;
-    expect(await ctx.deps.storage.listAnalyses(repoId)).toHaveLength(1);
+    expect(await ctx.deps.storage.listAnalyses(repositoryId)).toHaveLength(1);
   });
 
   it("rejects a delivery whose body is not raw JSON", async () => {
@@ -148,11 +165,19 @@ describe("github webhook — routing", () => {
   });
 
   it("ignores repositories that are not connected", async () => {
+    // The installation is claimed and delivering; it is this repository under it
+    // that nobody registered. Asserting the reason keeps the test honest — an
+    // earlier check bailing out first would otherwise look like a pass.
+    await connectRepository("acme", "api");
+
     const res = await ctx.app.inject(
-      delivery("pull_request", pullRequestPayload("someone", "else")),
+      delivery("pull_request", pullRequestPayload("acme", "unregistered")),
     );
+
     expect(res.statusCode).toBe(202);
-    expect((res.json() as { status: string }).status).toBe("ignored");
+    const body = res.json() as { status: string; reason: string };
+    expect(body.status).toBe("ignored");
+    expect(body.reason).toBe("repository is not connected to ProofForge");
   });
 
   it("ignores non-analyzable pull request actions", async () => {
@@ -171,12 +196,16 @@ describe("github webhook — routing", () => {
       delivery("installation", {
         action: "created",
         installation: { id: 555, account: { login: "acme" } },
+        sender: { id: 4242 },
       }),
     );
     expect(created.statusCode).toBe(202);
     expect(await ctx.deps.storage.getInstallation(555)).toMatchObject({
       githubInstallationId: 555,
       accountLogin: "acme",
+      // Nobody has claimed it yet, and the installer is remembered so somebody can.
+      organizationId: null,
+      installedBy: "4242",
     });
 
     await ctx.app.inject(
@@ -189,5 +218,84 @@ describe("github webhook — routing", () => {
     const res = await ctx.app.inject(delivery("star", { action: "created" }));
     expect(res.statusCode).toBe(202);
     expect((res.json() as { status: string }).status).toBe("ignored");
+  });
+});
+
+/**
+ * The routing rule that decides whose evidence a delivery becomes.
+ *
+ * Registering a repository is not a claim on it. Anyone signed in can type
+ * `owner/name` into the API, so if a delivery were matched on that pair alone,
+ * the first person to type a victim's repository would receive their analyses —
+ * and read the evidence bundle attached to each one.
+ */
+describe("github webhook — tenant isolation", () => {
+  it("does not route a delivery to a squatter who merely registered the name", async () => {
+    // The real owner, connected properly.
+    const victim = await connectRepository("acme", "api", 987);
+
+    // The squatter: their own organization, their own installation, and a
+    // repository row naming somebody else's repository.
+    const attackerUser = await ctx.deps.storage.createUser({
+      name: "mallory",
+      email: "mallory@example.com",
+    });
+    const attackerOrg = await ctx.deps.storage.createOrganization({
+      name: "Mallory",
+      slug: "mallory",
+      ownerId: attackerUser.id,
+    });
+    await ctx.deps.storage.upsertInstallation({
+      githubInstallationId: 1000,
+      accountLogin: "mallory",
+    });
+    await ctx.deps.storage.claimInstallation(1000, attackerOrg.id);
+    const squatted = await ctx.deps.storage.createRepository({
+      organizationId: attackerOrg.id,
+      owner: "acme",
+      name: "api",
+      defaultBranch: "main",
+      language: null,
+      private: false,
+    });
+
+    const res = await ctx.app.inject(delivery("pull_request", pullRequestPayload()));
+
+    expect(res.statusCode).toBe(202);
+    expect((res.json() as { status: string }).status).toBe("analysis_started");
+    // The analysis belongs to the account the installation was delivered for,
+    // and the squatter's row never sees a thing.
+    expect(await ctx.deps.storage.listAnalyses(victim.repositoryId)).toHaveLength(1);
+    expect(await ctx.deps.storage.listAnalyses(squatted.id)).toHaveLength(0);
+  });
+
+  it("ignores a delivery from an installation nobody has claimed", async () => {
+    // Everything is in place except the connection between the installation and
+    // a tenant — so there is no organization the result could belong to.
+    const user = await ctx.deps.storage.createUser({ name: "u", email: "u@example.com" });
+    const org = await ctx.deps.storage.createOrganization({
+      name: "Acme",
+      slug: "acme",
+      ownerId: user.id,
+    });
+    await ctx.deps.storage.createRepository({
+      organizationId: org.id,
+      owner: "acme",
+      name: "api",
+      defaultBranch: "main",
+      language: null,
+      private: false,
+    });
+    await ctx.deps.storage.upsertInstallation({
+      githubInstallationId: 987,
+      accountLogin: "acme",
+    });
+
+    const res = await ctx.app.inject(delivery("pull_request", pullRequestPayload()));
+
+    expect(res.statusCode).toBe(202);
+    const body = res.json() as { status: string; reason: string };
+    expect(body.status).toBe("ignored");
+    expect(body.reason).toContain("not connected to an organization");
   });
 });

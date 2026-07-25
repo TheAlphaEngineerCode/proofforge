@@ -78,6 +78,10 @@ export interface Installation {
   id: string;
   githubInstallationId: number;
   accountLogin: string | null;
+  /** The tenant this installation's deliveries belong to; null until claimed. */
+  organizationId: string | null;
+  /** GitHub user id of whoever installed the App, as reported by the signed webhook. */
+  installedBy: string | null;
   suspended: boolean;
   createdAt: string;
 }
@@ -85,6 +89,7 @@ export interface Installation {
 export interface NewInstallation {
   githubInstallationId: number;
   accountLogin?: string | null;
+  installedBy?: string | null;
   suspended?: boolean;
 }
 
@@ -134,17 +139,27 @@ export interface Storage {
   createRepository(input: NewRepository): Promise<Repository>;
   listRepositories(organizationId: string): Promise<Repository[]>;
   getRepository(id: string): Promise<Repository | null>;
-  /** Resolve a repository from the `owner/name` pair a webhook carries. */
-  findRepositoryByFullName(owner: string, name: string): Promise<Repository | null>;
+  /**
+   * Resolve the `owner/name` a webhook carries, within one organization.
+   *
+   * Scoped rather than global on purpose: the same GitHub repository may be
+   * registered by more than one tenant, and only the one whose installation
+   * delivered the event has any claim to the result.
+   */
+  findRepository(organizationId: string, owner: string, name: string): Promise<Repository | null>;
 
   upsertInstallation(input: NewInstallation): Promise<Installation>;
   getInstallation(githubInstallationId: number): Promise<Installation | null>;
+  /** Bind an installation to the organization whose deliveries it carries. */
+  claimInstallation(githubInstallationId: number, organizationId: string): Promise<Installation>;
   deleteInstallation(githubInstallationId: number): Promise<void>;
 
   createAnalysis(input: NewAnalysis): Promise<Analysis>;
   getAnalysis(id: string): Promise<Analysis | null>;
   updateAnalysis(id: string, update: AnalysisUpdate): Promise<Analysis>;
   listAnalyses(repositoryId: string): Promise<Analysis[]>;
+  /** The analysis already bound to this commit, if there is one. */
+  findAnalysisByCommit(repositoryId: string, commitSha: string): Promise<Analysis | null>;
 
   createEvidenceBundle(input: NewEvidenceBundle): Promise<EvidenceBundle>;
   getEvidenceBundle(id: string): Promise<EvidenceBundle | null>;

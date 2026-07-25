@@ -18,6 +18,7 @@ export const unauthorized = (message = "authentication required"): HttpError =>
   new HttpError(401, message);
 export const forbidden = (message = "forbidden"): HttpError => new HttpError(403, message);
 export const notFound = (message = "not found"): HttpError => new HttpError(404, message);
+export const conflict = (message: string): HttpError => new HttpError(409, message);
 
 /**
  * Parse a request payload against a Zod schema, throwing a 400 on failure.

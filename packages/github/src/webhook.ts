@@ -74,6 +74,10 @@ const InstallationEventSchema = z.object({
     id: z.number().int(),
     account: z.object({ login: z.string() }).optional(),
   }),
+  // Who pressed Install. GitHub sends this on every delivery, and on this one it
+  // is the only thing that ties an installation to a person — see
+  // {@link InstallationChange.installedBy}.
+  sender: z.object({ id: z.number().int() }).optional(),
 });
 
 // ── normalized results ──────────────────────────────────────────────────────
@@ -103,6 +107,15 @@ export interface InstallationChange {
   installationId: number;
   account: string | null;
   action: string;
+  /**
+   * The numeric id of the GitHub user who installed the App, as a string.
+   *
+   * This is the only unforgeable link between an installation and a person. It
+   * arrives inside a body GitHub signed, so a caller cannot assert it about
+   * themselves — which is what makes it usable as proof when someone later
+   * claims the installation for an organization.
+   */
+  installedBy: string | null;
 }
 
 export type ParsedWebhook =
@@ -181,6 +194,8 @@ export function parseWebhook(eventName: string, payload: unknown): ParsedWebhook
           installationId: parsed.data.installation.id,
           account: parsed.data.installation.account?.login ?? null,
           action: parsed.data.action,
+          installedBy:
+            parsed.data.sender === undefined ? null : String(parsed.data.sender.id),
         },
       };
     }

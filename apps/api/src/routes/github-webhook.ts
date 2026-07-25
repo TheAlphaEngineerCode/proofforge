@@ -9,9 +9,9 @@
  * deliberately ignore — so GitHub does not retry them indefinitely. Only a failed
  * signature check returns 401.
  */
-import type { FastifyInstance } from "fastify";
+import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { parseWebhook, verifyWebhookSignature } from "@proofforge/github";
-import { isTerminal } from "@proofforge/shared-types";
+import { isTerminal, type Analysis } from "@proofforge/shared-types";
 import type { AppDeps } from "../deps.js";
 import type { GitHubPublisher, PublishTarget } from "../services/github-publisher.js";
 
@@ -69,13 +69,17 @@ export async function githubWebhookRoutes(app: FastifyInstance, deps: AppDeps): 
 
       switch (parsed.type) {
         case "installation": {
-          const { installationId, account, action } = parsed.change;
+          const { installationId, account, action, installedBy } = parsed.change;
           if (action === "deleted") {
             await deps.storage.deleteInstallation(installationId);
           } else {
             await deps.storage.upsertInstallation({
               githubInstallationId: installationId,
               accountLogin: account,
+              // Recorded on the way in because it is only trustworthy here: this
+              // body carries GitHub's signature, and a later claim carries only
+              // the claimant's word.
+              installedBy,
               suspended: action === "suspend",
             });
           }
@@ -85,7 +89,7 @@ export async function githubWebhookRoutes(app: FastifyInstance, deps: AppDeps): 
 
         case "pull_request": {
           const { target } = parsed;
-          const result = await startAnalysis(deps, {
+          const result = await startAnalysis(deps, request.log, {
             owner: target.owner,
             repo: target.repo,
             headSha: target.headSha,
@@ -98,7 +102,7 @@ export async function githubWebhookRoutes(app: FastifyInstance, deps: AppDeps): 
 
         case "push": {
           const { target } = parsed;
-          const result = await startAnalysis(deps, {
+          const result = await startAnalysis(deps, request.log, {
             owner: target.owner,
             repo: target.repo,
             headSha: target.headSha,
@@ -127,30 +131,46 @@ interface StartAnalysisInput {
 /**
  * Start an analysis for a webhook target, if that repository is connected to
  * ProofForge. Publishing back to GitHub happens once the pipeline finishes.
+ *
+ * The tenant is decided by the installation that delivered the event, never by
+ * the repository name in it. A name is something anyone can register; the
+ * installation is something GitHub only sends to an App that was installed on
+ * that account, and that a person here has proven they installed.
  */
 async function startAnalysis(
   deps: AppDeps,
+  log: FastifyBaseLogger,
   input: StartAnalysisInput,
 ): Promise<{ status: string; analysisId?: string; reason?: string }> {
-  const repository = await deps.storage.findRepositoryByFullName(input.owner, input.repo);
+  const publisher = deps.publisher;
+  const installationId = input.installationId;
+  if (installationId === null) {
+    return { status: "ignored", reason: "delivery carries no installation" };
+  }
+
+  const installation = await deps.storage.getInstallation(installationId);
+  if (!installation?.organizationId) {
+    return { status: "ignored", reason: "installation is not connected to an organization" };
+  }
+
+  const repository = await deps.storage.findRepository(
+    installation.organizationId,
+    input.owner,
+    input.repo,
+  );
   if (!repository) {
     return { status: "ignored", reason: "repository is not connected to ProofForge" };
   }
 
-  const publisher = deps.publisher;
-  const installationId = input.installationId;
-
   // GitHub redelivers webhooks, and evidence is bound to a commit — so the same
   // commit must never spawn a second analysis. Reuse the existing one instead.
-  const existing = (await deps.storage.listAnalyses(repository.id)).find(
-    (candidate) => candidate.commitSha === input.headSha,
-  );
+  const existing = await deps.storage.findAnalysisByCommit(repository.id, input.headSha);
   if (existing) {
     // Pushing to a pull request fires `push` (no PR number) and `pull_request`
     // for the same commit, and the push usually wins the race. Skipping the
     // second event entirely would mean the pull request never gets its comment,
     // so publish it here — the check run already exists, so only comment.
-    if (publisher && installationId !== null && input.pullRequest !== undefined) {
+    if (publisher && input.pullRequest !== undefined) {
       const target: PublishTarget = {
         owner: input.owner,
         repo: input.repo,
@@ -164,23 +184,33 @@ async function startAnalysis(
     return { status: "already_analyzed", analysisId: existing.id };
   }
 
-  const analysis = await deps.storage.createAnalysis({
-    repositoryId: repository.id,
-    commitSha: input.headSha,
-  });
+  // The lookup above and this insert are two statements, and `push` and
+  // `pull_request` for one head arrive together — so both can find nothing. The
+  // unique index is what settles it; losing that race means the analysis exists,
+  // which is the outcome we wanted, not a failure to report.
+  let analysis: Analysis;
+  try {
+    analysis = await deps.storage.createAnalysis({
+      repositoryId: repository.id,
+      commitSha: input.headSha,
+    });
+  } catch (err) {
+    const winner = await deps.storage.findAnalysisByCommit(repository.id, input.headSha);
+    if (!winner) throw err;
+    return { status: "already_analyzed", analysisId: winner.id };
+  }
 
   // The publish target travels with the job: whoever runs the analysis — this
   // process or a worker off Redis — reports the result when the run finishes.
-  const target: PublishTarget | undefined =
-    publisher && installationId !== null
-      ? {
-          owner: input.owner,
-          repo: input.repo,
-          installationId,
-          headSha: input.headSha,
-          ...(input.pullRequest === undefined ? {} : { pullRequest: input.pullRequest }),
-        }
-      : undefined;
+  const target: PublishTarget | undefined = publisher
+    ? {
+        owner: input.owner,
+        repo: input.repo,
+        installationId,
+        headSha: input.headSha,
+        ...(input.pullRequest === undefined ? {} : { pullRequest: input.pullRequest }),
+      }
+    : undefined;
 
   void deps.queue
     .enqueue({
@@ -188,8 +218,7 @@ async function startAnalysis(
       ...(target === undefined ? {} : { publish: target }),
     })
     .catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(`[github] failed to enqueue analysis ${analysis.id}: ${message}`);
+      log.error({ err, analysisId: analysis.id }, "[github] failed to enqueue analysis");
     });
 
   return { status: "analysis_started", analysisId: analysis.id };

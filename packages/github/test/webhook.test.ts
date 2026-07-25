@@ -117,10 +117,28 @@ describe("parseWebhook — push and installation", () => {
     const result = parseWebhook("installation", {
       action: "created",
       installation: { id: 555, account: { login: "acme" } },
+      sender: { id: 4242 },
     });
     expect(result.type).toBe("installation");
     if (result.type !== "installation") return;
-    expect(result.change).toEqual({ installationId: 555, account: "acme", action: "created" });
+    expect(result.change).toEqual({
+      installationId: 555,
+      account: "acme",
+      action: "created",
+      installedBy: "4242",
+    });
+  });
+
+  // Who installed the App is what a later claim is checked against, so a
+  // delivery that does not say leaves it unknown rather than guessing.
+  it("reports no installer when the delivery names no sender", () => {
+    const result = parseWebhook("installation", {
+      action: "created",
+      installation: { id: 555 },
+    });
+    expect(result.type).toBe("installation");
+    if (result.type !== "installation") return;
+    expect(result.change.installedBy).toBeNull();
   });
 
   it("ignores unsupported events", () => {

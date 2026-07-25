@@ -125,6 +125,8 @@ function toInstallation(row: InstallationRow): Installation {
     id: row.id,
     githubInstallationId: row.githubInstallationId,
     accountLogin: row.accountLogin,
+    organizationId: row.organizationId,
+    installedBy: row.installedBy,
     suspended: row.suspended,
     createdAt: iso(row.createdAt),
   };
@@ -234,11 +236,21 @@ export class DrizzleStorage implements Storage {
     return rows[0] ? toRepository(rows[0]) : null;
   }
 
-  async findRepositoryByFullName(owner: string, name: string): Promise<Repository | null> {
+  async findRepository(
+    organizationId: string,
+    owner: string,
+    name: string,
+  ): Promise<Repository | null> {
     const rows = await this.db
       .select()
       .from(schema.repositories)
-      .where(and(eq(schema.repositories.owner, owner), eq(schema.repositories.name, name)))
+      .where(
+        and(
+          eq(schema.repositories.organizationId, organizationId),
+          eq(schema.repositories.owner, owner),
+          eq(schema.repositories.name, name),
+        ),
+      )
       .limit(1);
     return rows[0] ? toRepository(rows[0]) : null;
   }
@@ -290,6 +302,20 @@ export class DrizzleStorage implements Storage {
       .where(eq(schema.analyses.repositoryId, repositoryId))
       .orderBy(desc(schema.analyses.createdAt));
     return rows.map(toAnalysis);
+  }
+
+  async findAnalysisByCommit(repositoryId: string, commitSha: string): Promise<Analysis | null> {
+    const rows = await this.db
+      .select()
+      .from(schema.analyses)
+      .where(
+        and(
+          eq(schema.analyses.repositoryId, repositoryId),
+          eq(schema.analyses.commitSha, commitSha),
+        ),
+      )
+      .limit(1);
+    return rows[0] ? toAnalysis(rows[0]) : null;
   }
 
   // ── evidence bundles ──────────────────────────────────────────────────────
@@ -359,10 +385,14 @@ export class DrizzleStorage implements Storage {
       .values({
         githubInstallationId: input.githubInstallationId,
         accountLogin: input.accountLogin ?? null,
+        installedBy: input.installedBy ?? null,
         suspended: input.suspended ?? false,
       })
       .onConflictDoUpdate({
         target: schema.installations.githubInstallationId,
+        // `organizationId` and `installedBy` are deliberately absent: a later
+        // delivery reports the current state of the installation, not a decision
+        // to move it to another tenant or to rewrite who installed it.
         set: {
           accountLogin: input.accountLogin ?? null,
           suspended: input.suspended ?? false,
@@ -371,6 +401,21 @@ export class DrizzleStorage implements Storage {
       })
       .returning();
     return toInstallation(first(rows));
+  }
+
+  async claimInstallation(
+    githubInstallationId: number,
+    organizationId: string,
+  ): Promise<Installation> {
+    const rows = await this.db
+      .update(schema.installations)
+      .set({ organizationId, updatedAt: new Date() })
+      .where(eq(schema.installations.githubInstallationId, githubInstallationId))
+      .returning();
+
+    const row = rows[0];
+    if (!row) throw new Error(`installation not found: ${githubInstallationId}`);
+    return toInstallation(row);
   }
 
   async getInstallation(githubInstallationId: number): Promise<Installation | null> {
