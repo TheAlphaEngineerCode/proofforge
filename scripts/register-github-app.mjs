@@ -24,13 +24,13 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const args = parseArgs(process.argv.slice(2));
-const PORT = Number(args.port ?? 4567);
-const APP_NAME = args.name ?? `ProofForge Dev ${randomBytes(2).toString("hex")}`;
+const PORT = readPort(args.port);
+const APP_NAME = args.name || `ProofForge Dev ${randomBytes(2).toString("hex")}`;
 const WEBHOOK_PATH = "/api/v1/github/webhook";
 const OAUTH_CALLBACK_PATH = "/api/v1/auth/github/callback";
 const API_PORT = Number(process.env.API_PORT ?? 3001);
 /** Where the API answers from GitHub's side. Absent, this is a laptop behind smee. */
-const API_URL = (args["api-url"] ?? "").replace(/\/$/, "");
+const API_URL = readApiUrl(args["api-url"]);
 
 /** Least privilege: only what the checks + PR comment flow actually needs. */
 const PERMISSIONS = {
@@ -233,13 +233,55 @@ const escapeHtml = (value) =>
     (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
   );
 
+/**
+ * A flag with nothing after it records an empty string rather than undefined,
+ * which keeps "not passed" and "passed with no value" apart — they mean
+ * different things, and only the second one is a mistake.
+ */
 function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg.startsWith("--")) out[arg.slice(2)] = argv[i + 1];
+    if (!arg.startsWith("--")) continue;
+    const next = argv[i + 1];
+    out[arg.slice(2)] = next === undefined || next.startsWith("--") ? "" : next;
   }
   return out;
+}
+
+/**
+ * An App is created once and its URLs are awkward to change afterwards, so a
+ * malformed argument has to stop the run rather than quietly produce an App
+ * pointed somewhere else. `--api-url` with nothing after it used to fall back
+ * to the local flow, which is the one mistake worth being loud about.
+ */
+function readApiUrl(value) {
+  if (value === undefined) return "";
+  const trimmed = String(value).trim().replace(/\/$/, "");
+  let parsed;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    fail(`--api-url needs a full URL, like https://api.example.com (got "${value ?? ""}")`);
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    fail(`--api-url must be http or https (got "${parsed.protocol}")`);
+  }
+  return trimmed;
+}
+
+function readPort(value) {
+  if (value === undefined) return 4567;
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    fail(`--port must be a port number (got "${value}")`);
+  }
+  return port;
+}
+
+function fail(message) {
+  console.error(`\n  ${message}\n`);
+  process.exit(2);
 }
 
 main().catch((err) => {
