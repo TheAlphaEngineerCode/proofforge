@@ -7,10 +7,14 @@
  * hands back the app id, private key and webhook secret. This script captures
  * those and writes them where the API expects them — nothing is copied by hand.
  *
- * It also provisions a smee.io channel so webhooks reach a laptop that has no
- * public address.
+ * For a laptop with no public address it provisions a smee.io channel and points
+ * the App at that. Pass --api-url when the API is already deployed somewhere
+ * reachable, and the App is pointed straight at it instead:
+ *
+ *   node scripts/register-github-app.mjs --api-url https://api.example.com
  *
  * Usage: node scripts/register-github-app.mjs [--name "..."] [--port 4567]
+ *                                             [--api-url https://...]
  */
 import { createServer } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -23,7 +27,10 @@ const args = parseArgs(process.argv.slice(2));
 const PORT = Number(args.port ?? 4567);
 const APP_NAME = args.name ?? `ProofForge Dev ${randomBytes(2).toString("hex")}`;
 const WEBHOOK_PATH = "/api/v1/github/webhook";
+const OAUTH_CALLBACK_PATH = "/api/v1/auth/github/callback";
 const API_PORT = Number(process.env.API_PORT ?? 3001);
+/** Where the API answers from GitHub's side. Absent, this is a laptop behind smee. */
+const API_URL = (args["api-url"] ?? "").replace(/\/$/, "");
 
 /** Least privilege: only what the checks + PR comment flow actually needs. */
 const PERMISSIONS = {
@@ -35,16 +42,26 @@ const PERMISSIONS = {
 const EVENTS = ["pull_request", "push", "check_suite"];
 
 async function main() {
-  const smeeUrl = await createSmeeChannel();
-  console.log(`\n  Webhook proxy: ${smeeUrl}`);
+  // A deployed API takes its deliveries directly; only a laptop needs the relay.
+  const smeeUrl = API_URL === "" ? await createSmeeChannel() : "";
+  const publicUrl = API_URL === "" ? `http://localhost:${API_PORT}` : API_URL;
+  const webhookUrl = API_URL === "" ? smeeUrl : `${API_URL}${WEBHOOK_PATH}`;
+
+  console.log(`\n  Webhook: ${webhookUrl}`);
+  console.log(`  OAuth callback: ${publicUrl}${OAUTH_CALLBACK_PATH}`);
 
   const state = randomBytes(16).toString("hex");
   const manifest = {
     name: APP_NAME,
     url: "https://github.com/TheAlphaEngineerCode/proofforge",
     description: "Proof-Carrying Change: verifiable evidence for every pull request.",
-    hook_attributes: { url: smeeUrl, active: true },
+    hook_attributes: { url: webhookUrl, active: true },
+    // Where GitHub returns *this script* after the App is created, which is a
+    // different thing from where it returns a person after they sign in.
     redirect_url: `http://localhost:${PORT}/callback`,
+    // Sign-in. Without this the App has no OAuth callback at all, and every
+    // login fails on GitHub's side with a redirect_uri mismatch.
+    callback_urls: [`${publicUrl}${OAUTH_CALLBACK_PATH}`],
     public: false,
     default_permissions: PERMISSIONS,
     default_events: EVENTS,
@@ -59,9 +76,14 @@ async function main() {
   console.log("  Wrote .secrets/github-app.pem\n");
   console.log("  Next:");
   console.log(`    1. Install it:  ${credentials.html_url}/installations/new`);
-  console.log(`    2. Forward hooks: npx smee-client --url ${smeeUrl} \\`);
-  console.log(`         --target http://localhost:${API_PORT}${WEBHOOK_PATH}`);
-  console.log("    3. Start the API: pnpm --filter @proofforge/api dev\n");
+  if (smeeUrl === "") {
+    console.log("    2. Copy GITHUB_APP_* and GITHUB_WEBHOOK_SECRET from .env to the");
+    console.log("       deployment. They are read at startup, so it has to restart.\n");
+  } else {
+    console.log(`    2. Forward hooks: npx smee-client --url ${smeeUrl} \\`);
+    console.log(`         --target http://localhost:${API_PORT}${WEBHOOK_PATH}`);
+    console.log("    3. Start the API: pnpm --filter @proofforge/api dev\n");
+  }
 }
 
 /** smee.io hands out a channel by redirecting /new to it. */
@@ -154,7 +176,9 @@ async function persist(credentials, smeeUrl) {
     // Escaped so the PEM survives as a single .env line; the API unescapes it.
     GITHUB_APP_PRIVATE_KEY: credentials.pem.replace(/\n/g, "\\n"),
     GITHUB_WEBHOOK_SECRET: credentials.webhook_secret ?? "",
-    SMEE_URL: smeeUrl,
+    // Only when there is a relay to record; an empty SMEE_URL reads like a
+    // channel that stopped working rather than one that was never needed.
+    ...(smeeUrl === "" ? {} : { SMEE_URL: smeeUrl }),
   });
 }
 

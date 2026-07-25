@@ -20,13 +20,19 @@ requests, publishes a Check Run on the commit and posts (or updates) a verificat
 
 ```bash
 make github-app     # or: node scripts/register-github-app.mjs
+
+# when the API is already deployed somewhere GitHub can reach:
+node scripts/register-github-app.mjs --api-url https://api.example.com
 ```
 
-The script provisions a [smee.io](https://smee.io) channel so webhooks can reach a
-machine with no public address, then opens a page that hands GitHub a pre-filled
-**app manifest**. You press *Create GitHub App* once; GitHub returns the app id,
-private key and webhook secret, and the script writes them to `.env` and
+The script opens a page that hands GitHub a pre-filled **app manifest**. You press
+*Create GitHub App* once; GitHub returns the app id, client id and secret, private
+key and webhook secret, and the script writes them to `.env` and
 `.secrets/github-app.pem` (both git-ignored). Nothing is copied by hand.
+
+Without `--api-url` it provisions a [smee.io](https://smee.io) channel, so webhooks
+reach a machine with no public address and the OAuth callback points at
+`localhost`. With it, both point straight at the deployment.
 
 Permissions requested are the minimum the flow needs:
 
@@ -59,8 +65,11 @@ If you would rather not use the manifest flow:
 1. **Settings → Developer settings → GitHub Apps → New GitHub App**.
 2. **Webhook URL**: `https://<your-host>/api/v1/github/webhook`
    (for local development use a tunnel such as `smee.io` or `ngrok`).
-3. **Webhook secret**: generate a strong random value — it must match `GITHUB_WEBHOOK_SECRET`.
-4. **Permissions** (least privilege — request nothing beyond these):
+3. **Callback URL**: `https://<your-host>/api/v1/auth/github/callback` — this is
+   what signs people in, and an App without it rejects every login with a
+   `redirect_uri` mismatch.
+4. **Webhook secret**: generate a strong random value — it must match `GITHUB_WEBHOOK_SECRET`.
+5. **Permissions** (least privilege — request nothing beyond these):
 
    | Scope | Access | Why |
    | --- | --- | --- |
@@ -69,15 +78,15 @@ If you would rather not use the manifest flow:
    | Contents | Read-only | read the repository to analyze it |
    | Metadata | Read-only | mandatory for every App |
 
-5. **Subscribe to events**: `pull_request`, `push`, `check_suite`, `installation`.
-6. Generate a **private key** and download the `.pem`.
+6. **Subscribe to events**: `pull_request`, `push`, `check_suite`, `installation`.
+7. Generate a **private key** and download the `.pem`, and a **client secret** for sign-in.
 
 ## Configuration
 
 ```bash
 GITHUB_APP_ID=123456
 GITHUB_APP_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
-GITHUB_WEBHOOK_SECRET=<the secret from step 3>
+GITHUB_WEBHOOK_SECRET=<the secret from step 4>
 ```
 
 Without `GITHUB_APP_ID`/`GITHUB_APP_PRIVATE_KEY` the integration stays disabled: webhooks
@@ -91,8 +100,9 @@ The same App also authenticates *users*. A GitHub App carries its own OAuth
 credentials, so the dashboard needs no second OAuth App: the `client_id` that
 identifies ProofForge to a repository identifies it to a person too.
 
-Set the **Callback URL** on the App to `<API_BASE_URL>/api/v1/auth/github/callback`
-(`http://localhost:3001/api/v1/auth/github/callback` in development), then:
+The registration script sets the App's **Callback URL** to
+`<API_BASE_URL>/api/v1/auth/github/callback` for you; on an App registered by hand,
+set it there. Then:
 
 ```bash
 GITHUB_APP_CLIENT_ID=Iv1.xxxxxxxxxxxx
