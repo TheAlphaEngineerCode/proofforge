@@ -12,15 +12,19 @@
  *
  *   docker run -d --name pf-pg-test -e POSTGRES_PASSWORD=proofforge \
  *     -e POSTGRES_DB=proofforge -p 55432:5432 postgres:16-alpine
- *   psql ... -f migrations/0000_fine_morbius.sql
+ *
+ * The schema is applied here rather than by whoever runs the suite: these tests
+ * ran for a while against tables a separate psql step was trusted to have
+ * created, which is a dependency on the order of two things nothing enforced.
  */
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { DrizzleStorage } from "../src/drizzle-storage.js";
 import { InMemoryStorage } from "../src/memory.js";
+import { migrate } from "../src/migrate.js";
 import * as schema from "../src/schema.js";
 import type { AuditLog, Storage } from "../src/storage.js";
 
@@ -33,6 +37,10 @@ describeWithDb("DrizzleStorage against PostgreSQL", () => {
   const client = postgres(url ?? "", { max: 4 });
   const db = drizzle(client, { schema });
   const storage: Storage = new DrizzleStorage(db);
+
+  beforeAll(async () => {
+    await migrate(url ?? "");
+  });
 
   beforeEach(async () => {
     await db.execute(

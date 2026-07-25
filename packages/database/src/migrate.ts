@@ -51,16 +51,21 @@ export async function migrate(
       .filter((name) => name.endsWith(".sql"))
       .sort((a, b) => a.localeCompare(b));
 
-    await sql`
-      CREATE TABLE IF NOT EXISTS ${sql(LEDGER)} (
-        name text PRIMARY KEY,
-        applied_at timestamptz NOT NULL DEFAULT now()
-      )
-    `;
-
+    // The lock comes first, before even the ledger exists. `CREATE TABLE IF NOT
+    // EXISTS` is not safe to run concurrently — two instances can both find it
+    // absent and the loser fails on a duplicate key in the system catalogue —
+    // and serialising every migration except the one that creates the ledger
+    // would leave the race in the one place nobody tests.
     await sql`SELECT pg_advisory_lock(${LOCK_KEY})`;
 
     try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS ${sql(LEDGER)} (
+          name text PRIMARY KEY,
+          applied_at timestamptz NOT NULL DEFAULT now()
+        )
+      `;
+
       const recorded = await sql<{ name: string }[]>`SELECT name FROM ${sql(LEDGER)}`;
       const done = new Set(recorded.map((row) => row.name));
 
