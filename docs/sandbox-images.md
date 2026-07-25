@@ -24,7 +24,7 @@ that status into a result.
 | Stack | Image | Contents |
 | --- | --- | --- |
 | pytest, pytest-benchmark | `ghcr.io/thealphaengineercode/proofforge-sandbox-python:3.12` | `python:3.12-slim`, pytest, pytest-cov, uv |
-| vitest | `ghcr.io/thealphaengineercode/proofforge-sandbox-node:20` | `node:20-slim`, pnpm 9.15 |
+| vitest | `ghcr.io/thealphaengineercode/proofforge-sandbox-node:20` | `node:20-slim`, pnpm 9.15 (installed globally, not via corepack) |
 
 Both run as uid **10001** and own `/work` and `/out`. The uid is not incidental:
 the sandbox passes `--user 10001:10001`, so an image whose directories belong to
@@ -33,6 +33,12 @@ an error anybody would notice. `.github/workflows/sandbox-images.yml` asserts th
 uid, the write path and the tooling on each build, before pushing — mounting `/out`
 the way the runner does, from the host rather than as a volume, since a volume
 inherits the image's ownership and would pass either way.
+
+The tooling is checked with no network and a read-only root, because it has to be
+*in* the image rather than fetched on first use. That check is what caught the
+node image shipping a pinned pnpm it never used: corepack keys its cache to the
+current user's home, so a version prepared as root left `runner` downloading the
+newest pnpm at run time — one that requires a Node this image does not have.
 
 Sources are in [`infrastructure/docker/`](../infrastructure/docker/).
 

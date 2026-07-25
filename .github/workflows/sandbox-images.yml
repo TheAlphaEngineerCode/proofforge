@@ -91,11 +91,17 @@ jobs:
             'touch /out/probe && test -w /work'
           test -f out/probe  # the collector reads it from the host, not the container
 
+          # The tooling has to be in the image, not fetched on first use. Run it
+          # with no network and a read-only root so anything that quietly
+          # downloads itself fails here instead of in a sandbox — which is how
+          # the node image shipped a pinned pnpm it never actually used.
           if [ "$STACK" = "python" ]; then
-            docker run --rm "$IMAGE" 'python -m pytest --version && python -m coverage --version && uv --version'
+            probe='python -m pytest --version && python -m coverage --version && uv --version'
           else
-            docker run --rm "$IMAGE" 'node --version && pnpm --version'
+            probe='node --version && pnpm --version'
           fi
+          docker run --rm --network none --read-only --tmpfs /tmp:rw \
+            --user 10001:10001 --volume /work --env HOME=/work "$IMAGE" "$probe"
 
       - name: Sign in to ghcr
         uses: docker/login-action@v3
