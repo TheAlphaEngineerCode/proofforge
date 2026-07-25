@@ -11,6 +11,11 @@ RUN corepack enable
 
 # Dependencies resolve from the manifests alone, so this layer survives every
 # change that does not touch a package.json or the lockfile — which is most of them.
+#
+# Every workspace package the API reaches has to be listed. A package added to
+# the API and not added here installs no dependencies and fails at the build
+# below, which is how the queue went missing between Phase 8a and the first
+# deploy — so CI now builds this image, and the omission cannot go quiet again.
 FROM base AS deps
 WORKDIR /repo
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -22,7 +27,9 @@ COPY packages/evidence-spec/package.json packages/evidence-spec/
 COPY packages/github/package.json packages/github/
 COPY packages/observability/package.json packages/observability/
 COPY packages/policy-engine/package.json packages/policy-engine/
+COPY packages/queue/package.json packages/queue/
 COPY packages/shared-types/package.json packages/shared-types/
+COPY packages/test-fixtures/package.json packages/test-fixtures/
 RUN pnpm install --frozen-lockfile --filter @proofforge/api...
 
 FROM deps AS build
