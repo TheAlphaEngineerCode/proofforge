@@ -47,7 +47,6 @@ evidence
   .option("--base <sha>", "base commit the diff is taken against (default: HEAD~1)")
   .option("--output-dir <dir>", "where the engine writes the bundle (default: <repo>/.proofforge/bundle)")
   .option("--signing-key <file>", "ed25519 private key (PEM or raw base64) to sign the manifest")
-  .option("--image <digest>", "sandbox image digest to record in the manifest")
   .option("--json", "emit machine-readable JSON output", false)
   .action(
     (
@@ -56,7 +55,6 @@ evidence
         base?: string;
         outputDir?: string;
         signingKey?: string;
-        image?: string;
         json: boolean;
       },
     ) => {
@@ -66,7 +64,6 @@ evidence
           base: opts.base,
           outputDir: opts.outputDir,
           signingKey: opts.signingKey,
-          image: opts.image,
         }),
       );
     },

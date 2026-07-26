@@ -21,6 +21,9 @@ class FakeToolchain:
     def __init__(self, read: Reader) -> None:
         self._read = read
 
+    def observed_image(self) -> str:
+        return "ghcr.io/example/sandbox@sha256:" + "b" * 64
+
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
         return (
             RawOutput(status="ok", text=self._read("junit.xml")),
@@ -60,7 +63,7 @@ def _context() -> ChangeContext:
 def test_engine_builds_bundle_and_consolidates_evidence(
     tmp_path: Path, read_fixture: Reader
 ) -> None:
-    engine = EvidenceEngine(FakeToolchain(read_fixture), container_image="img@sha256:abc")
+    engine = EvidenceEngine(FakeToolchain(read_fixture))
     result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
 
     ev = result.evidence
@@ -256,3 +259,28 @@ def test_absent_coverage_is_not_billed_as_zero_percent(tmp_path, read_fixture) -
         tmp_path / "b", _context(), tmp_path / "bundle-b"
     )
     assert "below the 90% guideline" in " ".join(measured.manifest["risk"]["reasons"])
+
+
+def test_manifest_names_the_image_the_toolchain_observed(
+    tmp_path: Path, read_fixture: Reader
+) -> None:
+    # The one field in the manifest that describes where the run happened. It is
+    # read from the toolchain rather than accepted from the caller, so that it
+    # cannot be asserted by whoever wanted a particular answer.
+    engine = EvidenceEngine(FakeToolchain(read_fixture))
+
+    result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
+
+    environment = result.manifest["environment"]
+    assert isinstance(environment, dict)
+    assert environment["containerImage"] == FakeToolchain(read_fixture).observed_image()
+
+
+def test_manifest_claims_no_image_when_nothing_ran(tmp_path: Path) -> None:
+    engine = EvidenceEngine(NullToolchain())
+
+    result = engine.run(tmp_path / "repo", _context(), tmp_path / "bundle")
+
+    environment = result.manifest["environment"]
+    assert isinstance(environment, dict)
+    assert environment["containerImage"] == ""

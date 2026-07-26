@@ -60,7 +60,9 @@ proofforge evidence build . --json
   overridden; `--base <sha>` sets the commit the diff is taken against (default `HEAD~1`).
 - `--output-dir <dir>` — where the bundle is written (default `<repo>/.proofforge/bundle`).
 - `--signing-key <file>` — ed25519 private key (PEM or raw base64) to sign the manifest.
-- `--image <digest>` — sandbox image digest to record in the manifest.
+- The manifest's `environment.containerImage` is not settable. It reports the image the
+  sandbox actually ran, resolved to a digest, and is empty when no repository code ran at
+  all — a flag that let a caller name it would be a provenance claim about nothing.
 - Exit `0` only when the engine built a bundle **and** the manifest verifies; the engine not
   being installed exits `2` (nothing ran), a manifest that fails verification exits `1`.
 - The engine runs as a Python service under `uv`; set `PROOFFORGE_EVIDENCE_DIR` if it is not

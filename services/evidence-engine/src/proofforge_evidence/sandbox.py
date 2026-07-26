@@ -62,6 +62,10 @@ class SandboxResult:
     stderr: str
     timed_out: bool
     duration_ms: int
+    #: What actually ran, pinned to a digest when the daemon can name one. A tag
+    #: is a moving label — reporting it as provenance would say only which name
+    #: was asked for, not which bytes answered.
+    image: str = ""
 
 
 def build_docker_command(spec: SandboxSpec, *, container_name: str) -> list[str]:
@@ -128,6 +132,33 @@ def docker_available() -> bool:
     return result.returncode == 0
 
 
+def resolve_image(reference: str) -> str:
+    """Name the image bytes behind ``reference``, as precisely as the daemon allows.
+
+    A repository digest is the answer we want: it survives a tag being moved and
+    identifies exactly what ran. An image built locally has never been pushed and
+    so has no repository digest — its content id is the next best thing. If the
+    daemon cannot tell us either, the reference is returned unchanged, and a
+    caller reading the manifest can see that it is a tag rather than a digest.
+    """
+
+    for template in ("{{index .RepoDigests 0}}", "{{.Id}}"):
+        try:
+            completed = subprocess.run(
+                ["docker", "image", "inspect", "--format", template, reference],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return reference
+        resolved = completed.stdout.strip()
+        if completed.returncode == 0 and resolved and "<no value>" not in resolved:
+            return resolved
+    return reference
+
+
 class DockerSandbox:
     """Runs a :class:`SandboxSpec` in an ephemeral, hardened Docker container."""
 
@@ -153,6 +184,7 @@ class DockerSandbox:
                 stderr=_as_text(expired.stderr),
                 timed_out=True,
                 duration_ms=duration,
+                image=resolve_image(spec.image),
             )
 
         duration = int((time.monotonic() - started) * 1000)
@@ -162,6 +194,7 @@ class DockerSandbox:
             stderr=completed.stderr,
             timed_out=False,
             duration_ms=duration,
+            image=resolve_image(spec.image),
         )
 
     @staticmethod

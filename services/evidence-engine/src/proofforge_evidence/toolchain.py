@@ -61,6 +61,17 @@ class HostToolchain:
     ) -> None:
         self._timeout = timeout_s
         self._sandbox: Sandbox = sandbox if sandbox is not None else DockerSandbox()
+        self._observed_image = ""
+
+    def observed_image(self) -> str:
+        """The image repository code actually ran in, or "" if none ever did.
+
+        Empty is the honest answer when the sandbox never started — no Docker, no
+        supported runner, nothing to name. The manifest carries it as-is rather
+        than inventing a plausible tag.
+        """
+
+        return self._observed_image
 
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
         """Run the repository's tests in a container and collect the reports.
@@ -96,6 +107,10 @@ class HostToolchain:
             )
 
             result = self._sandbox.run(spec)
+            # First run that actually started wins, and the test run goes first —
+            # so a benchmark in a different image cannot rewrite what the manifest
+            # says the tests ran in.
+            self._observed_image = self._observed_image or result.image
             if result.timed_out:
                 return _both_unavailable(f"test run timed out after {self._timeout}s", "timeout")
 
@@ -147,6 +162,7 @@ class HostToolchain:
             )
 
             result = self._sandbox.run(spec)
+            self._observed_image = self._observed_image or result.image
             if result.timed_out:
                 return _unavailable(f"benchmarks timed out after {self._timeout}s", "timeout")
 

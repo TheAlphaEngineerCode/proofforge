@@ -112,3 +112,42 @@ def test_without_docker_nothing_runs_on_the_host(tmp_path: Path, monkeypatch) ->
 
     assert junit.status == "unavailable"
     assert sandbox.spec is None  # never even attempted
+
+
+DIGEST = "ghcr.io/thealphaengineercode/proofforge-sandbox-node@sha256:" + "a" * 64
+
+
+class DigestReportingSandbox(RecordingSandbox):
+    """A sandbox that names what it ran, the way the Docker one does."""
+
+    def run(self, spec: SandboxSpec) -> SandboxResult:
+        result = super().run(spec)
+        return SandboxResult(
+            exit_code=result.exit_code,
+            stdout=result.stdout,
+            stderr=result.stderr,
+            timed_out=result.timed_out,
+            duration_ms=result.duration_ms,
+            image=DIGEST,
+        )
+
+
+def test_the_image_reported_is_the_one_that_ran(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: True)
+    toolchain = HostToolchain(sandbox=DigestReportingSandbox())
+
+    toolchain.run_tests(node_repo(tmp_path))
+
+    assert toolchain.observed_image() == DIGEST
+
+
+def test_no_image_is_claimed_when_nothing_ran(tmp_path: Path, monkeypatch) -> None:
+    # No Docker means repository code never executed. An empty answer is the
+    # point: the manifest would otherwise name an image that ran nothing.
+    monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: False)
+    toolchain = HostToolchain(sandbox=RecordingSandbox())
+
+    junit, _ = toolchain.run_tests(node_repo(tmp_path))
+
+    assert junit.status == "unavailable"
+    assert toolchain.observed_image() == ""

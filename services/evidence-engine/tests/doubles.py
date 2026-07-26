@@ -21,6 +21,10 @@ class NullToolchain:
     fabricated success.
     """
 
+    def observed_image(self) -> str:
+        """Nothing ran, so there is no image to name."""
+        return ""
+
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:  # noqa: ARG002
         return RawOutput(status="unavailable"), RawOutput(status="unavailable")
 

@@ -40,6 +40,14 @@ class Toolchain(Protocol):
     """Produces raw tool output for a repository. Implementations decide whether a
     tool runs on the host (static scanners) or in a sandbox (code execution)."""
 
+    def observed_image(self) -> str:
+        """The image repository code ran in, as observed. "" when none did.
+
+        Asked rather than told: this is the manifest's only claim about where the
+        run happened, and a value the caller could supply would be a claim about
+        nothing. Empty means no code ran, which is a fact worth being able to say.
+        """
+
     def run_tests(self, repo: Path) -> tuple[RawOutput, RawOutput]:
         """Return (JUnit XML, Cobertura XML) outputs."""
 
@@ -63,11 +71,9 @@ class EvidenceEngine:
         self,
         toolchain: Toolchain,
         *,
-        container_image: str = "",
         signer: Signer | None = None,
     ) -> None:
         self._toolchain = toolchain
-        self._image = container_image
         self._signer = signer
 
     def run(self, repo: Path, context: ChangeContext, bundle_dir: Path) -> EngineResult:
@@ -96,7 +102,11 @@ class EvidenceEngine:
         self._collect_sbom(repo, evidence, artifacts, artifacts_dir)
 
         manifest = build_manifest(
-            context, evidence, artifacts, container_image=self._image, signer=self._signer
+            context,
+            evidence,
+            artifacts,
+            container_image=self._toolchain.observed_image(),
+            signer=self._signer,
         )
 
         (bundle_dir / "proof-manifest.json").write_text(

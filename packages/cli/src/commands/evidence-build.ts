@@ -45,8 +45,6 @@ export interface EvidenceBuildOptions {
   outputDir?: string;
   /** Path to an ed25519 private key (PEM or raw base64) to sign the manifest. */
   signingKey?: string;
-  /** Sandbox image digest to record in the manifest. */
-  image?: string;
   /** Injected by tests; defaults to reading git for real. */
   git?: GitContextReader;
   /** Injected by tests; defaults to running the engine for real. */
@@ -65,7 +63,7 @@ export interface BuilderResult {
 export type EvidenceBuilder = (
   repoPath: string,
   context: BuildContext,
-  options: { outputDir: string; signingKey?: string; image?: string },
+  options: { outputDir: string; signingKey?: string },
 ) => BuilderResult;
 
 export type GitContextReader = (repoPath: string, base?: string) => BuildContext;
@@ -89,7 +87,6 @@ export function evidenceBuild(path: string, options: EvidenceBuildOptions = {}):
   const built = build(repoPath, context, {
     outputDir,
     signingKey: options.signingKey,
-    image: options.image,
   });
 
   if (built.status === "unavailable") {
@@ -240,7 +237,7 @@ function parseRemote(
 function runEngine(
   repoPath: string,
   context: BuildContext,
-  options: { outputDir: string; signingKey?: string; image?: string },
+  options: { outputDir: string; signingKey?: string },
 ): BuilderResult {
   const empty: Omit<BuilderResult, "status" | "detail"> = { manifestPath: "", stdout: "" };
 
@@ -274,7 +271,6 @@ function runEngine(
     `--output-dir=${options.outputDir}`,
   ];
   if (context.pr !== undefined) args.push(`--pr=${context.pr}`);
-  if (options.image !== undefined && options.image !== "") args.push(`--image=${options.image}`);
   if (options.signingKey !== undefined && options.signingKey !== "") {
     args.push(`--signing-key=${resolve(options.signingKey)}`);
   }

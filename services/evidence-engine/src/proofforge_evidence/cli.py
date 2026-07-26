@@ -54,7 +54,6 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument(
         "--output-dir", default=".proofforge/bundle", help="where to write the bundle"
     )
-    build.add_argument("--image", default="", help="sandbox image digest recorded in the manifest")
     build.add_argument(
         "--signing-key",
         default=None,
@@ -92,7 +91,7 @@ def _run_build(args: argparse.Namespace) -> int:
             print(f"error: {err}", file=sys.stderr)
             return 2
 
-    engine = EvidenceEngine(HostToolchain(), container_image=args.image, signer=signer)
+    engine = EvidenceEngine(HostToolchain(), signer=signer)
     bundle_dir = Path(args.output_dir)
     result = engine.run(repo, context, bundle_dir)
 
