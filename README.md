@@ -201,7 +201,13 @@ leaves `EVIDENCE_ENGINE_DIR` unset, and without it the pipeline is never wired
 ([`factory.ts`](./apps/api/src/factory.ts)); the API image carries no Python or uv, so there
 would be nothing to run if it were set; and a Render web service has no Docker daemon, so
 the sandbox could not start either. Real evidence needs a host with Docker — self-hosted,
-or CI.
+or CI. Ask any instance which it is: `/ready` answers `"evidence": "simulated"` or
+`"configured"`, and the process says the same thing in its startup log.
+
+Where the pipeline should execute is settled in
+[ADR 0009](./docs/adr/0009-where-the-pipeline-executes.md): the worker built in Phase 8a
+already collects real evidence wherever it has Docker and the engine, and the hosted
+service will execute in GitHub Actions rather than take custody of anyone's code.
 
 It runs on Render's free plan, which shows: the services hibernate after roughly 15 idle
 minutes, so the first request takes about 50 seconds, and the free PostgreSQL expires

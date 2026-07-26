@@ -48,7 +48,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerErrorHandler(app);
   registerAuth(app, deps.storage);
 
-  healthRoutes(app);
+  healthRoutes(app, deps);
+
+  // Said once, where whoever starts the process will see it. A deployment that
+  // cannot collect evidence still serves manifests, and the difference between
+  // those manifests and real ones is not visible in the response.
+  if (deps.config.evidenceEngineDir === "") {
+    app.log.warn(
+      "[evidence] EVIDENCE_ENGINE_DIR is unset: manifests are simulated, not collected",
+    );
+  }
+
   metricsRoutes(app, deps);
   authRoutes(app, deps);
   organizationRoutes(app, deps);

@@ -15,7 +15,23 @@ afterEach(async () => {
 describe("health & auth", () => {
   it("serves health and readiness without auth", async () => {
     expect((await ctx.app.inject({ url: "/health" })).json()).toEqual({ status: "ok" });
-    expect((await ctx.app.inject({ url: "/ready" })).json()).toEqual({ status: "ready" });
+    // "simulated" is the truth about a test instance, and saying it is the point:
+    // an instance with no pipeline serves the same shapes as one with it.
+    expect((await ctx.app.inject({ url: "/ready" })).json()).toEqual({
+      status: "ready",
+      evidence: "simulated",
+    });
+  });
+
+  it("reports a configured pipeline once the engine is wired", async () => {
+    const wired = await setup({ EVIDENCE_ENGINE_DIR: "/opt/proofforge/evidence-engine" });
+
+    expect((await wired.app.inject({ url: "/ready" })).json()).toEqual({
+      status: "ready",
+      evidence: "configured",
+    });
+
+    await wired.app.close();
   });
 
   it("rejects /me without a token", async () => {
