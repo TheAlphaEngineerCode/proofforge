@@ -9,7 +9,7 @@
  * consume from a queue nothing else can reach, which is a silent no-op, not a
  * degraded mode worth having.
  */
-import { loadConfig } from "./config.js";
+import { evidenceMode, loadConfig, SIMULATED_EVIDENCE_WARNING } from "./config.js";
 import { createWorker } from "./factory.js";
 
 async function main(): Promise<void> {
@@ -17,6 +17,13 @@ async function main(): Promise<void> {
   const worker = createWorker(config);
   worker.start();
   process.stdout.write("[proofforge-worker] consuming analyses from the queue\n");
+
+  // This is the process that would do the collecting, so it is the one whose
+  // silence would cost the most: a worker with no pipeline consumes the queue
+  // and produces simulated manifests exactly as fast as a real one.
+  if (evidenceMode(config) === "simulated") {
+    process.stderr.write(`${SIMULATED_EVIDENCE_WARNING}\n`);
+  }
 
   const shutdown = (signal: string): void => {
     process.stdout.write(`[proofforge-worker] ${signal} received, draining\n`);

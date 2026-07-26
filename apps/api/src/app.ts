@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import { evidenceMode, SIMULATED_EVIDENCE_WARNING } from "./config.js";
 import type { AppDeps } from "./deps.js";
 import { registerErrorHandler } from "./errors.js";
 import { registerAuth } from "./plugins/auth.js";
@@ -53,10 +54,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // Said once, where whoever starts the process will see it. A deployment that
   // cannot collect evidence still serves manifests, and the difference between
   // those manifests and real ones is not visible in the response.
-  if (deps.config.evidenceEngineDir === "") {
-    app.log.warn(
-      "[evidence] EVIDENCE_ENGINE_DIR is unset: manifests are simulated, not collected",
-    );
+  if (evidenceMode(deps.config) === "simulated") {
+    app.log.warn(SIMULATED_EVIDENCE_WARNING);
   }
 
   metricsRoutes(app, deps);

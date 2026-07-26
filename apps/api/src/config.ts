@@ -73,6 +73,22 @@ const ConfigSchema = z.object({
 
 export type Config = z.infer<typeof ConfigSchema>;
 
+/**
+ * Whether this process can collect evidence or only simulate it.
+ *
+ * `configured` says the pipeline is wired, which is all a process-level answer
+ * can honestly claim — a single analysis can still degrade, and that manifest
+ * says so itself. Both the readiness endpoint and the startup banners read it
+ * from here so the two can never disagree about what this instance is.
+ */
+export function evidenceMode(config: Config): "simulated" | "configured" {
+  return config.evidenceEngineDir === "" ? "simulated" : "configured";
+}
+
+/** What to tell an operator when a process starts without a pipeline. */
+export const SIMULATED_EVIDENCE_WARNING =
+  "[evidence] EVIDENCE_ENGINE_DIR is unset: manifests are simulated, not collected";
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const config = ConfigSchema.parse({
     nodeEnv: env.NODE_ENV,

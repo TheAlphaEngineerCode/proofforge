@@ -15,6 +15,7 @@
  * that manifest says so itself.
  */
 import type { FastifyInstance } from "fastify";
+import { evidenceMode } from "../config.js";
 import type { AppDeps } from "../deps.js";
 
 export function healthRoutes(app: FastifyInstance, deps: AppDeps): void {
@@ -22,6 +23,6 @@ export function healthRoutes(app: FastifyInstance, deps: AppDeps): void {
 
   app.get("/ready", async () => ({
     status: "ready",
-    evidence: deps.config.evidenceEngineDir === "" ? "simulated" : "configured",
+    evidence: evidenceMode(deps.config),
   }));
 }
