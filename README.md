@@ -2,15 +2,30 @@
 
 # ProofForge
 
-**Autonomous Software Engineering with Verifiable Changes**
+**Autonomous software engineering with verifiable changes — not another CI dashboard.**
 
-_Engenharia de software autônoma com mudanças verificáveis_
+Every change carries its own evidence. ProofForge runs a repository's tests in an isolated
+sandbox, collects security and dependency findings, scores the risk transparently, and emits a
+hashable manifest that **any other machine can verify independently**.
 
+[![CI](https://github.com/TheAlphaEngineerCode/proofforge/actions/workflows/ci.yml/badge.svg)](https://github.com/TheAlphaEngineerCode/proofforge/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Spec: proof-manifest 1.1.0](https://img.shields.io/badge/proof--manifest-1.1.0-8A2BE2.svg)](./docs/evidence-spec.md)
 [![Status: Phases 0–7 + observability](https://img.shields.io/badge/status-phases_0--7_%2B_observability-brightgreen.svg)](./ROADMAP.md)
 
 </div>
+
+---
+
+## Current state — read this before cloning
+
+**Phases 0 to 7 are complete, plus observability, and the application runs.** You can clone it,
+bring the stack up and put a pull request through the full pipeline: sandboxed test execution,
+evidence collection, risk scoring, policy evaluation and a signed `proof-manifest.json`.
+
+What is **not** finished, said plainly: the GitHub App is not registered yet, so there is no
+sign-in through GitHub and no automatic reaction to real pull-request webhooks — you drive the
+pipeline yourself. [`ROADMAP.md`](./ROADMAP.md) tracks the rest.
 
 ---
 
