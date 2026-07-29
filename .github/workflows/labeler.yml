@@ -1,0 +1,21 @@
+name: Pull request labels
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    name: Label changed areas
+    runs-on: ubuntu-latest
+    steps:
+      # pull_request_target is safe here because no contributor code is checked
+      # out or executed. The official action reads only the base configuration.
+      - uses: actions/labeler@v6
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          sync-labels: true

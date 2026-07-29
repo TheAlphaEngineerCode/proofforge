@@ -1,0 +1,34 @@
+changed-files-labels-limit: 5
+max-files-changed: 500
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ["**/*.md", "docs/**"]
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: [".github/**", "infrastructure/docker/**"]
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/package.json"
+          - "pnpm-lock.yaml"
+          - "**/pyproject.toml"
+          - "**/uv.lock"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "**/*.test.ts"
+          - "**/*.spec.ts"
+          - "**/tests/**"
+          - "**/test/**"
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: ["apps/web/**"]
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: ["apps/api/**", "packages/**", "services/**"]
