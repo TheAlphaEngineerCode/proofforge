@@ -34,9 +34,9 @@ jobs:
         run: |
           set -euo pipefail
           jq -r '.[].number' <<< "$RELEASE_PRS" | while read -r number; do
-            branch=$(gh pr view "$number" --json headRefName --jq .headRefName)
-            if [ "$(gh pr view "$number" --json isDraft --jq .isDraft)" != "true" ]; then
-              gh pr ready "$number" --undo
+            branch=$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json headRefName --jq .headRefName)
+            if [ "$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != "true" ]; then
+              gh pr ready "$number" --repo "$GITHUB_REPOSITORY" --undo
             fi
             gh workflow run ci.yml --ref "$branch"
           done
