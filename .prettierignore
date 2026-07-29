@@ -3,4 +3,5 @@ dist/
 coverage/
 .turbo/
 pnpm-lock.yaml
+.release-please-manifest.json
 *.md
