@@ -1,6 +1,7 @@
-# Default owners for everything in the repo.
-# Replace with real GitHub handles/teams before enabling branch protection.
-* @proofforge/maintainers
+# Keep ownership resolvable on GitHub so contributors always know who reviews.
+* @TheAlphaEngineerCode
 
-/packages/evidence-spec/ @proofforge/maintainers
-/.github/                 @proofforge/maintainers
+/packages/evidence-spec/ @TheAlphaEngineerCode
+/.github/                 @TheAlphaEngineerCode
+/infrastructure/         @TheAlphaEngineerCode
+/services/               @TheAlphaEngineerCode

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/TheAlphaEngineerCode/proofforge/security/advisories/new
+    about: Report vulnerabilities privately. Do not disclose security issues in public.
+  - name: Contribution guide
+    url: https://github.com/TheAlphaEngineerCode/proofforge/blob/main/CONTRIBUTING.md
+    about: Read the development workflow and quality requirements before contributing.
