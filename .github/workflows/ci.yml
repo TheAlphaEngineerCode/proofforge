@@ -188,10 +188,24 @@ jobs:
           # unrelated to secrets is one people learn to wave through.
           fetch-depth: 0
 
-      - name: Gitleaks (secret scan)
+      - name: Gitleaks (event range)
+        if: github.event_name != 'workflow_dispatch'
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Release Please uses workflow_dispatch because GitHub intentionally does
+      # not trigger workflows from pull requests created with GITHUB_TOKEN. The
+      # Gitleaks action treats manual dispatches as full-history scans, so scan
+      # only the release branch delta here. Historical findings remain a
+      # separate audit concern and cannot make a clean release draft look red.
+      - name: Gitleaks (release branch range)
+        if: github.event_name == 'workflow_dispatch'
+        run: >-
+          docker run --rm
+          --volume "$PWD:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1
+          git --redact --log-opts="origin/main..HEAD" /repo
 
       - name: Trivy (filesystem vulnerability scan)
         uses: aquasecurity/trivy-action@v0.36.0
