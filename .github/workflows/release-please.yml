@@ -38,5 +38,5 @@ jobs:
             if [ "$(gh pr view "$number" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != "true" ]; then
               gh pr ready "$number" --repo "$GITHUB_REPOSITORY" --undo
             fi
-            gh workflow run ci.yml --ref "$branch"
+            gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
           done
