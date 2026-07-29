@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: write
   contents: write
   issues: write
   pull-requests: write
@@ -16,6 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           # A dedicated fine-grained token can be added later so CI also starts
           # on bot-authored release PRs. The scoped GITHUB_TOKEN is the safe
@@ -23,3 +25,18 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Keep release pull requests draft and run CI
+        if: steps.release.outputs.prs_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_PRS: ${{ steps.release.outputs.prs }}
+        run: |
+          set -euo pipefail
+          jq -r '.[].number' <<< "$RELEASE_PRS" | while read -r number; do
+            branch=$(gh pr view "$number" --json headRefName --jq .headRefName)
+            if [ "$(gh pr view "$number" --json isDraft --jq .isDraft)" != "true" ]; then
+              gh pr ready "$number" --undo
+            fi
+            gh workflow run ci.yml --ref "$branch"
+          done
