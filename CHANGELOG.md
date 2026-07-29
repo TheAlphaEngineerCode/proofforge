@@ -4,6 +4,21 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## 0.1.0 (2026-07-29)
+
+
+### Features
+
+* automate contributor and release workflows ([#19](https://github.com/TheAlphaEngineerCode/proofforge/issues/19)) ([45e09d3](https://github.com/TheAlphaEngineerCode/proofforge/commit/45e09d3aa4d2b256d0aaa57c7a191615fdb99c01))
+
+
+### Bug Fixes
+
+* align generated releases with quality gates ([#23](https://github.com/TheAlphaEngineerCode/proofforge/issues/23)) ([c438739](https://github.com/TheAlphaEngineerCode/proofforge/commit/c438739220e82d2f128d4470635944e0289577f5))
+* **ci:** scope release secret scans ([#26](https://github.com/TheAlphaEngineerCode/proofforge/issues/26)) ([c2e46d0](https://github.com/TheAlphaEngineerCode/proofforge/commit/c2e46d0d1188b6383b3b47baf8a135fcfaa5ad88))
+* resolve repository for release dispatch ([#24](https://github.com/TheAlphaEngineerCode/proofforge/issues/24)) ([a6eb051](https://github.com/TheAlphaEngineerCode/proofforge/commit/a6eb0516217b7996c53f8e4bc3bce9bcd6fac778))
+* scope release workflow dispatch ([#25](https://github.com/TheAlphaEngineerCode/proofforge/issues/25)) ([fdb13ba](https://github.com/TheAlphaEngineerCode/proofforge/commit/fdb13ba329942d1091df0687150f2d8048e49ac7))
+
 ## [Unreleased]
 
 ### Added
