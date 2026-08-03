@@ -130,14 +130,14 @@ Collector provenance is counted by status, so a collector that has been unavaila
 week cannot read as a week of clean results. Deployment note: `/metrics` is unauthenticated
 and shares a port with the public API — block it at the reverse proxy.
 
-## Phase 8 — Distributed system 🚧
+## Phase 8 — Distributed system ✅
 
-Queues, workers, retries, idempotency, scalability, Kubernetes, Helm, distributed tracing.
+Queues, workers, retries, idempotency, scalability.
 
 **Done when:** many jobs run in parallel, failures recover, jobs are idempotent, metrics
-are available, deploys are reproducible.
+are available.
 
-**Done (8a — queue, workers, cross-process events):** `packages/queue` provides a `JobQueue`
+**Done (queue, workers, cross-process events):** `packages/queue` provides a `JobQueue`
 with an in-process backend and a BullMQ/Redis backend, and a `RedisEventBus` that moves
 pipeline events between processes. `apps/api` chooses its backend from `REDIS_URL`: unset, it
 runs analyses in-process as before; set, it only enqueues while separate `worker` processes run
@@ -147,16 +147,44 @@ in-memory backend keeps every other test hermetic; a Redis integration job and a
 distributed test (enqueue in one instance, run in a worker, events bridged back) run against a
 real server. Metrics from Observability already count per-collector provenance across all runs.
 
-**Remaining (8b):** the API and worker images build on every change in CI, which is what keeps
-a dependency added to an app but not to its Dockerfile from reaching a deploy — but nothing
-publishes them, and there are no Kubernetes manifests or Helm chart (`infrastructure/` holds
-only `docker/`). **Remaining (8c):** distributed tracing across the enqueue/run boundary, now
-that it spans processes.
+The API and worker images build on every change in CI, which is what keeps a dependency added to
+an app but not to its Dockerfile from reaching a deploy. Nothing publishes them — see below.
 
-## Phase 9 — SDK & plugins ⬜
+## Evidence, proved on this repository ✅
 
-SDK plus plugin points for analyzers, policies and evidence collectors, with docs and
-examples.
+The `Evidence · this change, proved` job runs the real pipeline against the commit under review:
+the Python engine collects, the sandbox executes the tests in a container, and the TypeScript
+library verifies the manifest the engine wrote. The bundle is published as a build artifact.
 
-**Done when:** an external plugin can be created against a stable API with a working
-example and sufficient documentation.
+This is the roadmap's own claim turned back on itself. Everywhere else the pipeline is exercised
+against fixtures; here it runs on real commits, in public, on every change — and it is the only
+public surface that can, since a Render web service has neither a Docker daemon nor Python.
+
+## Deliberately out of scope
+
+These were planned and are not being built. Leaving them listed as "planned" indefinitely would
+be the dishonest option — a roadmap that never closes an item is a wish list.
+
+**Kubernetes manifests and a Helm chart.** The supported deployments are `docker run` and the
+Render blueprint, and both work today. Manifests for an orchestrator nobody is running would be
+configuration that is never applied, and therefore never known to be correct — the same
+"unmeasured passing as verified" that this project exists to argue against.
+
+**Publishing the API and worker images.** The images build in CI on every change, which is what
+that job is for: catching a dependency that reached an app but not its Dockerfile. Publishing
+them would add a registry to keep current and vulnerability-scan for as long as the tags exist,
+in exchange for saving one `docker build` for the small number of people self-hosting. The
+sandbox runner images *are* published, because the pipeline pulls them by default and cannot
+work without them.
+
+**Distributed tracing.** Observability deliberately stopped short of OpenTelemetry, and Phase 8
+crossing a process boundary is a weaker reason to add it than it first appears: the queue carries
+the analysis id as the job id, and the structured logs on both sides key on it, so a run is
+already followable end to end. A tracing backend would be more machinery than signal at one
+producer and one consumer.
+
+**A plugin SDK.** There is no second implementor. A plugin API designed without one is a guess at
+a stable interface, and the cost of guessing wrong is paid forever in compatibility. The
+extension points that exist are real ones: the manifest schema is versioned and published, the
+policy files are YAML with a validator, and the collectors are separate processes reading tool
+output — anything that emits a schema-valid manifest already interoperates.
