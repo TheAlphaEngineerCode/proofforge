@@ -247,3 +247,84 @@ jobs:
           push: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  evidence:
+    name: Evidence · this change, proved
+    runs-on: ubuntu-latest
+    # ProofForge's claim is that a change can carry verifiable evidence of
+    # itself. Everywhere else that claim is tested against fixtures; here it is
+    # made about this repository's own commits. The runner is the one place the
+    # project has that can actually do it — the hosted instance has no Docker
+    # daemon and no Python, so every manifest it emits is simulated and says so.
+    #
+    # The command builds the manifest with the Python engine and then verifies
+    # it with the TypeScript library, so a green job means the two agree on the
+    # hash. A collector that cannot run is reported as such and charged for by
+    # the risk score; that is a finding about the change, not a broken build, so
+    # only a manifest that fails to build or fails to verify fails this job.
+    steps:
+      # The engine diffs against the parent commit, which a depth-1 checkout
+      # does not have.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20.11.0
+          cache: pnpm
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.3.2
+        with:
+          python-version: "3.12"
+
+      # The collectors are looked up on PATH by name. Installing them is what
+      # separates a manifest that measured something from one that reports four
+      # unavailable collectors and a risk score inflated by their absence.
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@v0.3.1
+
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@v0.24.0
+
+      - name: Install Gitleaks and Semgrep
+        # Same Gitleaks version the security job runs, so the two jobs cannot
+        # disagree about what a secret is.
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz" \
+            | tar -xz -C "$HOME/.local/bin" gitleaks
+          uv tool install semgrep
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # Test execution happens inside the published sandbox image, pulled
+      # anonymously — repository code never runs on the runner itself.
+      - name: Build and verify a proof-manifest for this commit
+        env:
+          # The sandbox installs this monorepo's dependencies before it can run a
+          # single test, and the 300s default is spent well before that finishes —
+          # the collector would report `timeout` on every run and measure nothing.
+          PROOFFORGE_TOOL_TIMEOUT_S: "1800"
+        run: node packages/cli/dist/index.js evidence build . --output-dir ./bundle
+
+      - name: Publish the bundle
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: proof-manifest-${{ github.sha }}
+          path: ./bundle
+          if-no-files-found: warn
