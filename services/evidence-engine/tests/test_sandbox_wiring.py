@@ -36,6 +36,18 @@ def node_repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+class FailingSandbox:
+    """Starts, writes no report, and fails with the given stderr."""
+
+    def __init__(self, *, stderr: str) -> None:
+        self._stderr = stderr
+
+    def run(self, spec: SandboxSpec) -> SandboxResult:
+        return SandboxResult(
+            exit_code=1, stdout="", stderr=self._stderr, timed_out=False, duration_ms=90
+        )
+
+
 def test_reports_are_collected_from_the_sandbox(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: True)
     sandbox = RecordingSandbox()
@@ -180,3 +192,21 @@ def test_the_default_timeout_stands_when_nothing_is_set(monkeypatch) -> None:
     monkeypatch.delenv(TIMEOUT_ENV, raising=False)
 
     assert default_timeout_s() == 300
+
+
+def test_the_reason_reported_is_the_end_of_stderr_not_the_start(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # A tool that fetches something is noisy before it does any work: the first
+    # sandbox run in CI printed "Unable to find image ... locally" and layer-pull
+    # progress, and reporting the head of stderr named that as the cause of a
+    # failure that happened long afterwards.
+    noise = "Unable to find image 'ghcr.io/x/y:1' locally\n" + "layer: Pulling fs layer\n" * 40
+    monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: True)
+    toolchain = HostToolchain(sandbox=FailingSandbox(stderr=noise + "\nERROR: no tests ran"))
+
+    junit, _ = toolchain.run_tests(node_repo(tmp_path))
+
+    assert junit.status == "error"
+    assert "no tests ran" in junit.detail
+    assert "Unable to find image" not in junit.detail

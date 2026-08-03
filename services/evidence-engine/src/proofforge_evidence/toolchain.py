@@ -49,6 +49,22 @@ def _read_report(path: Path) -> str | None:
     return text if text.strip() else None
 
 
+def _why_it_failed(stderr: str, limit: int = 300) -> str:
+    """The last `limit` characters of stderr — where the reason actually is.
+
+    Taking the first characters instead reports whatever the tool said when it
+    started, and a tool that has to fetch something says a lot: the first run of
+    the sandbox in CI reported `Unable to find image ... locally` followed by
+    layer-pull progress as the cause of a failure that happened long afterwards.
+    Diagnosing from that is diagnosing from the wrong end of the output, and a
+    manifest that names a confident wrong cause is worse than one that says
+    nothing.
+    """
+
+    text = stderr.strip()
+    return text if len(text) <= limit else f"…{text[-limit:]}"
+
+
 _DEFAULT_TIMEOUT_S = 300
 
 #: Overrides the per-tool timeout, in seconds.
@@ -146,7 +162,7 @@ class HostToolchain:
             coverage = _read_report(out / "coverage.xml")
 
         if junit is None:
-            detail = result.stderr.strip()[:300] or f"runner exited {result.exit_code}"
+            detail = _why_it_failed(result.stderr) or f"runner exited {result.exit_code}"
             return (
                 RawOutput(status="error", detail=f"no JUnit report produced: {detail}"),
                 _unavailable("no coverage report produced"),
@@ -197,7 +213,7 @@ class HostToolchain:
             report = _read_report(out / "benchmarks.json")
 
         if report is None:
-            detail = result.stderr.strip()[:300] or f"runner exited {result.exit_code}"
+            detail = _why_it_failed(result.stderr) or f"runner exited {result.exit_code}"
             return RawOutput(status="error", detail=f"no benchmark report produced: {detail}")
         return RawOutput(status="ok", text=report, duration_ms=result.duration_ms)
 
@@ -264,7 +280,7 @@ class HostToolchain:
         if completed.returncode != 0:
             return RawOutput(
                 status="error",
-                detail=completed.stderr.strip()[:500] or f"exit code {completed.returncode}",
+                detail=_why_it_failed(completed.stderr, 500) or f"exit code {completed.returncode}",
                 duration_ms=duration,
             )
         return RawOutput(status="ok", text=completed.stdout, duration_ms=duration)
