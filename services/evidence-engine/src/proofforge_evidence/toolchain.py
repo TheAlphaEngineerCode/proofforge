@@ -8,6 +8,7 @@ unavailable the toolchain reports it cleanly instead of failing the whole run.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -47,7 +48,34 @@ def _read_report(path: Path) -> str | None:
         return None
     return text if text.strip() else None
 
+
 _DEFAULT_TIMEOUT_S = 300
+
+#: Overrides the per-tool timeout, in seconds.
+TIMEOUT_ENV = "PROOFFORGE_TOOL_TIMEOUT_S"
+
+
+def default_timeout_s() -> int:
+    """The per-tool timeout, overridable by the environment.
+
+    Five minutes is a reasonable default and a bad ceiling. It covers a scanner
+    on a small repository, but the test collector spends that budget installing
+    dependencies before a single test runs, and on a monorepo the install alone
+    can outlast it — which is reported as ``timeout``, honestly but uselessly,
+    with no way to say "this repository needs longer". A value that is not a
+    positive integer is ignored rather than obeyed: a timeout of zero would make
+    every collector fail instantly and read as a repository with nothing to
+    measure, which is the one misreading this project cannot allow.
+    """
+
+    raw = os.environ.get(TIMEOUT_ENV, "").strip()
+    if not raw:
+        return _DEFAULT_TIMEOUT_S
+    try:
+        seconds = int(raw)
+    except ValueError:
+        return _DEFAULT_TIMEOUT_S
+    return seconds if seconds > 0 else _DEFAULT_TIMEOUT_S
 
 
 class HostToolchain:
@@ -56,10 +84,10 @@ class HostToolchain:
     def __init__(
         self,
         *,
-        timeout_s: int = _DEFAULT_TIMEOUT_S,
+        timeout_s: int | None = None,
         sandbox: Sandbox | None = None,
     ) -> None:
-        self._timeout = timeout_s
+        self._timeout = default_timeout_s() if timeout_s is None else timeout_s
         self._sandbox: Sandbox = sandbox if sandbox is not None else DockerSandbox()
         self._observed_image = ""
 

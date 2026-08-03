@@ -5,7 +5,7 @@ from pathlib import Path
 
 from proofforge_evidence import runners
 from proofforge_evidence.sandbox import SandboxResult, SandboxSpec, build_docker_command
-from proofforge_evidence.toolchain import HostToolchain
+from proofforge_evidence.toolchain import TIMEOUT_ENV, HostToolchain, default_timeout_s
 
 JUNIT = '<testsuite tests="3" failures="0" errors="0" skipped="0" time="1"/>'
 COBERTURA = '<coverage line-rate="0.91"></coverage>'
@@ -151,3 +151,32 @@ def test_no_image_is_claimed_when_nothing_ran(tmp_path: Path, monkeypatch) -> No
 
     assert junit.status == "unavailable"
     assert toolchain.observed_image() == ""
+
+
+def test_the_tool_timeout_can_be_raised_for_slow_repositories(tmp_path: Path, monkeypatch) -> None:
+    # Five minutes has to cover installing dependencies before a test runs, and a
+    # monorepo can spend all of it on the install alone. Without this knob such a
+    # repository is permanently reported as `timeout`.
+    monkeypatch.setenv(TIMEOUT_ENV, "1800")
+    monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: True)
+    sandbox = RecordingSandbox()
+
+    HostToolchain(sandbox=sandbox).run_tests(node_repo(tmp_path))
+
+    assert sandbox.spec is not None
+    assert sandbox.spec.timeout_s == 1800
+
+
+def test_an_unusable_timeout_is_ignored_rather_than_obeyed(monkeypatch) -> None:
+    # A zero or negative timeout would fail every collector instantly, and a
+    # manifest full of timeouts reads like a repository with nothing to measure.
+    # Falling back is the only reading that cannot mislead.
+    for value in ("0", "-30", "soon", ""):
+        monkeypatch.setenv(TIMEOUT_ENV, value)
+        assert default_timeout_s() == 300
+
+
+def test_the_default_timeout_stands_when_nothing_is_set(monkeypatch) -> None:
+    monkeypatch.delenv(TIMEOUT_ENV, raising=False)
+
+    assert default_timeout_s() == 300
