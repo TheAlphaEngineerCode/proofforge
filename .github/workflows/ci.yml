@@ -313,13 +313,21 @@ jobs:
 
       # Test execution happens inside the published sandbox image, pulled
       # anonymously — repository code never runs on the runner itself.
+      # Measure the commit, not the checkout. By this point the working tree also
+      # holds `node_modules`, build output and the virtualenv `uv run` makes for
+      # the engine — none of which is part of the change, all of which the sandbox
+      # would copy into the container and install on top of. A worktree shares the
+      # object store, so this costs nothing and `HEAD~1` still resolves.
+      - name: Take a clean copy of the commit
+        run: git worktree add ../clean HEAD
+
       - name: Build and verify a proof-manifest for this commit
         env:
-          # The sandbox installs this monorepo's dependencies before it can run a
+          # The sandbox installs the repository's dependencies before it can run a
           # single test, and the 300s default is spent well before that finishes —
           # the collector would report `timeout` on every run and measure nothing.
           PROOFFORGE_TOOL_TIMEOUT_S: "1800"
-        run: node packages/cli/dist/index.js evidence build . --output-dir ./bundle
+        run: node packages/cli/dist/index.js evidence build ../clean --output-dir ./bundle
 
       - name: Publish the bundle
         if: always()
