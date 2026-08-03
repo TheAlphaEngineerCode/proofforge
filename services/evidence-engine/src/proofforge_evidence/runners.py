@@ -98,7 +98,25 @@ def plan_for(stack: str) -> RunnerPlan:
             script=_script(
                 install="python -m venv --system-site-packages .venv; "
                 ". .venv/bin/activate; "
-                "if [ -f uv.lock ]; then uv sync --frozen --active; "
+                # Two things this line has to get right, both learned the hard
+                # way from the first real run against this repository.
+                #
+                # `--active` does not exist in the uv the sandbox image pins
+                # (0.5.11). Under `set -e` the whole script died there, before
+                # pytest, so the collector reported "no JUnit report produced"
+                # for every uv project there has ever been. Activating the venv
+                # first is enough: uv installs into the project's own `.venv`,
+                # which is the one we just made and are about to run.
+                #
+                # `--all-packages` because a bare `uv sync` on a workspace root
+                # installs only the root project and none of its members. The
+                # tests then fail to import what they test, and pytest writes a
+                # report full of collection errors — which the parser would read,
+                # correctly, as a failing suite. That is the worse outcome: a
+                # runner that cannot install the project would be reporting a
+                # verdict about the change. On a single-package project it
+                # installs that one package, so nothing is lost.
+                "if [ -f uv.lock ]; then uv sync --frozen --all-packages; "
                 "elif [ -f requirements.txt ]; then "
                 "pip install --no-cache-dir -r requirements.txt; "
                 "else pip install --no-cache-dir -e .; fi",

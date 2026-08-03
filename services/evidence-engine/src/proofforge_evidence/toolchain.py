@@ -8,6 +8,7 @@ unavailable the toolchain reports it cleanly instead of failing the whole run.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -47,7 +48,77 @@ def _read_report(path: Path) -> str | None:
         return None
     return text if text.strip() else None
 
+
+def _reports_dir(scratch: str) -> Path:
+    """A directory inside `scratch` that the sandbox can write its reports into.
+
+    The sandbox runs as uid 10001 and that is not negotiable — it is the whole
+    point of running someone else's tests in a container. `mkdtemp` creates its
+    directory as 0700 owned by whoever started the engine, so the two never match
+    on a real host and the run ends with `Permission denied` on junit.xml *after*
+    the tests have already passed. The collector then reports "no JUnit report
+    produced", which reads as a repository whose tests could not run rather than
+    as a directory the reports could not be written to.
+
+    Hence a mode the container's user can write. It goes on a directory *nested*
+    inside the `mkdtemp` one rather than on that directory itself, and the nesting
+    is the security boundary rather than a tidiness preference: a world-writable
+    directory that anyone on the host can reach is somewhere a second local
+    account could swap junit.xml between the container writing it and the engine
+    reading it, which is evidence tampering in the one tool that must not permit
+    it. The 0700 parent means nobody but us can walk in; the container never walks
+    in either, since the daemon mounts the directory by inode.
+    """
+
+    reports = Path(scratch) / "reports"
+    reports.mkdir()
+    reports.chmod(0o777)
+    return reports
+
+
+def _why_it_failed(stderr: str, limit: int = 300) -> str:
+    """The last `limit` characters of stderr — where the reason actually is.
+
+    Taking the first characters instead reports whatever the tool said when it
+    started, and a tool that has to fetch something says a lot: the first run of
+    the sandbox in CI reported `Unable to find image ... locally` followed by
+    layer-pull progress as the cause of a failure that happened long afterwards.
+    Diagnosing from that is diagnosing from the wrong end of the output, and a
+    manifest that names a confident wrong cause is worse than one that says
+    nothing.
+    """
+
+    text = stderr.strip()
+    return text if len(text) <= limit else f"…{text[-limit:]}"
+
+
 _DEFAULT_TIMEOUT_S = 300
+
+#: Overrides the per-tool timeout, in seconds.
+TIMEOUT_ENV = "PROOFFORGE_TOOL_TIMEOUT_S"
+
+
+def default_timeout_s() -> int:
+    """The per-tool timeout, overridable by the environment.
+
+    Five minutes is a reasonable default and a bad ceiling. It covers a scanner
+    on a small repository, but the test collector spends that budget installing
+    dependencies before a single test runs, and on a monorepo the install alone
+    can outlast it — which is reported as ``timeout``, honestly but uselessly,
+    with no way to say "this repository needs longer". A value that is not a
+    positive integer is ignored rather than obeyed: a timeout of zero would make
+    every collector fail instantly and read as a repository with nothing to
+    measure, which is the one misreading this project cannot allow.
+    """
+
+    raw = os.environ.get(TIMEOUT_ENV, "").strip()
+    if not raw:
+        return _DEFAULT_TIMEOUT_S
+    try:
+        seconds = int(raw)
+    except ValueError:
+        return _DEFAULT_TIMEOUT_S
+    return seconds if seconds > 0 else _DEFAULT_TIMEOUT_S
 
 
 class HostToolchain:
@@ -56,10 +127,10 @@ class HostToolchain:
     def __init__(
         self,
         *,
-        timeout_s: int = _DEFAULT_TIMEOUT_S,
+        timeout_s: int | None = None,
         sandbox: Sandbox | None = None,
     ) -> None:
-        self._timeout = timeout_s
+        self._timeout = default_timeout_s() if timeout_s is None else timeout_s
         self._sandbox: Sandbox = sandbox if sandbox is not None else DockerSandbox()
         self._observed_image = ""
 
@@ -87,8 +158,8 @@ class HostToolchain:
         except runners.UnsupportedStackError as err:
             return _both_unavailable(f"no supported test runner: {err}")
 
-        with tempfile.TemporaryDirectory() as out_dir:
-            out = Path(out_dir)
+        with tempfile.TemporaryDirectory() as scratch:
+            out = _reports_dir(scratch)
             spec = SandboxSpec(
                 image=plan.image,
                 command=[plan.script],
@@ -118,7 +189,7 @@ class HostToolchain:
             coverage = _read_report(out / "coverage.xml")
 
         if junit is None:
-            detail = result.stderr.strip()[:300] or f"runner exited {result.exit_code}"
+            detail = _why_it_failed(result.stderr) or f"runner exited {result.exit_code}"
             return (
                 RawOutput(status="error", detail=f"no JUnit report produced: {detail}"),
                 _unavailable("no coverage report produced"),
@@ -146,8 +217,8 @@ class HostToolchain:
         except runners.UnsupportedStackError as err:
             return _unavailable(str(err))
 
-        with tempfile.TemporaryDirectory() as out_dir:
-            out = Path(out_dir)
+        with tempfile.TemporaryDirectory() as scratch:
+            out = _reports_dir(scratch)
             spec = SandboxSpec(
                 image=plan.image,
                 command=[plan.script],
@@ -169,7 +240,7 @@ class HostToolchain:
             report = _read_report(out / "benchmarks.json")
 
         if report is None:
-            detail = result.stderr.strip()[:300] or f"runner exited {result.exit_code}"
+            detail = _why_it_failed(result.stderr) or f"runner exited {result.exit_code}"
             return RawOutput(status="error", detail=f"no benchmark report produced: {detail}")
         return RawOutput(status="ok", text=report, duration_ms=result.duration_ms)
 
@@ -236,7 +307,7 @@ class HostToolchain:
         if completed.returncode != 0:
             return RawOutput(
                 status="error",
-                detail=completed.stderr.strip()[:500] or f"exit code {completed.returncode}",
+                detail=_why_it_failed(completed.stderr, 500) or f"exit code {completed.returncode}",
                 duration_ms=duration,
             )
         return RawOutput(status="ok", text=completed.stdout, duration_ms=duration)

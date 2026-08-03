@@ -1,11 +1,12 @@
 """The sandbox wiring, exercised without Docker by substituting the sandbox."""
 
 import json
+import os
 from pathlib import Path
 
 from proofforge_evidence import runners
 from proofforge_evidence.sandbox import SandboxResult, SandboxSpec, build_docker_command
-from proofforge_evidence.toolchain import HostToolchain
+from proofforge_evidence.toolchain import TIMEOUT_ENV, HostToolchain, default_timeout_s
 
 JUNIT = '<testsuite tests="3" failures="0" errors="0" skipped="0" time="1"/>'
 COBERTURA = '<coverage line-rate="0.91"></coverage>'
@@ -34,6 +35,18 @@ def node_repo(tmp_path: Path) -> Path:
         json.dumps({"devDependencies": {"vitest": "^2"}}), encoding="utf-8"
     )
     return tmp_path
+
+
+class FailingSandbox:
+    """Starts, writes no report, and fails with the given stderr."""
+
+    def __init__(self, *, stderr: str) -> None:
+        self._stderr = stderr
+
+    def run(self, spec: SandboxSpec) -> SandboxResult:
+        return SandboxResult(
+            exit_code=1, stdout="", stderr=self._stderr, timed_out=False, duration_ms=90
+        )
 
 
 def test_reports_are_collected_from_the_sandbox(tmp_path: Path, monkeypatch) -> None:
@@ -151,3 +164,82 @@ def test_no_image_is_claimed_when_nothing_ran(tmp_path: Path, monkeypatch) -> No
 
     assert junit.status == "unavailable"
     assert toolchain.observed_image() == ""
+
+
+def test_the_tool_timeout_can_be_raised_for_slow_repositories(tmp_path: Path, monkeypatch) -> None:
+    # Five minutes has to cover installing dependencies before a test runs, and a
+    # monorepo can spend all of it on the install alone. Without this knob such a
+    # repository is permanently reported as `timeout`.
+    monkeypatch.setenv(TIMEOUT_ENV, "1800")
+    monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: True)
+    sandbox = RecordingSandbox()
+
+    HostToolchain(sandbox=sandbox).run_tests(node_repo(tmp_path))
+
+    assert sandbox.spec is not None
+    assert sandbox.spec.timeout_s == 1800
+
+
+def test_an_unusable_timeout_is_ignored_rather_than_obeyed(monkeypatch) -> None:
+    # A zero or negative timeout would fail every collector instantly, and a
+    # manifest full of timeouts reads like a repository with nothing to measure.
+    # Falling back is the only reading that cannot mislead.
+    for value in ("0", "-30", "soon", ""):
+        monkeypatch.setenv(TIMEOUT_ENV, value)
+        assert default_timeout_s() == 300
+
+
+def test_the_default_timeout_stands_when_nothing_is_set(monkeypatch) -> None:
+    monkeypatch.delenv(TIMEOUT_ENV, raising=False)
+
+    assert default_timeout_s() == 300
+
+
+def test_the_reason_reported_is_the_end_of_stderr_not_the_start(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # A tool that fetches something is noisy before it does any work: the first
+    # sandbox run in CI printed "Unable to find image ... locally" and layer-pull
+    # progress, and reporting the head of stderr named that as the cause of a
+    # failure that happened long afterwards.
+    noise = "Unable to find image 'ghcr.io/x/y:1' locally\n" + "layer: Pulling fs layer\n" * 40
+    monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: True)
+    toolchain = HostToolchain(sandbox=FailingSandbox(stderr=noise + "\nERROR: no tests ran"))
+
+    junit, _ = toolchain.run_tests(node_repo(tmp_path))
+
+    assert junit.status == "error"
+    assert "no tests ran" in junit.detail
+    assert "Unable to find image" not in junit.detail
+
+
+def test_the_output_mount_is_writable_by_the_container_user(tmp_path: Path, monkeypatch) -> None:
+    # The sandbox runs as uid 10001 by design; mkdtemp makes its directory 0700
+    # owned by whoever started the engine. On a real host the two never match, and
+    # the run ends with `Permission denied` on junit.xml *after* the tests have
+    # already passed — reported as a repository whose tests could not run rather
+    # than as a directory the reports could not be written to.
+    #
+    # The second assertion is the one that matters more. Making the directory
+    # writable by anyone is only safe while nobody else can reach it: a local
+    # account that could walk in would be able to swap junit.xml between the
+    # container writing it and the engine reading it.
+    seen: list[tuple[int, int]] = []
+    monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: True)
+
+    class ModeRecordingSandbox(RecordingSandbox):
+        def run(self, spec: SandboxSpec) -> SandboxResult:
+            out = next(m.host for m in spec.mounts if m.container == runners.OUTPUT_DIR)
+            seen.append((out.stat().st_mode & 0o777, out.parent.stat().st_mode & 0o777))
+            return super().run(spec)
+
+    HostToolchain(sandbox=ModeRecordingSandbox()).run_tests(node_repo(tmp_path))
+
+    assert seen, "the sandbox never ran"
+    reports_mode, parent_mode = seen[0]
+    assert reports_mode & 0o022 == 0o022, "the container user cannot write its reports"
+    if os.name == "posix":
+        # Windows reports 0o777 for every directory because it does not implement
+        # these bits at all, so there is nothing to assert there — and nothing to
+        # protect either, since the whole uid mismatch this works around is POSIX.
+        assert parent_mode & 0o077 == 0, "anyone on the host can reach the reports"

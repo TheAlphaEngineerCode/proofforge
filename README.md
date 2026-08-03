@@ -11,7 +11,7 @@ hashable manifest that **any other machine can verify independently**.
 [![CI](https://github.com/TheAlphaEngineerCode/proofforge/actions/workflows/ci.yml/badge.svg)](https://github.com/TheAlphaEngineerCode/proofforge/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](./LICENSE)
 [![Spec: proof-manifest 1.1.0](https://img.shields.io/badge/proof--manifest-1.1.0-8A2BE2.svg)](./docs/evidence-spec.md)
-[![Status: Phases 0–7 + observability](https://img.shields.io/badge/status-phases_0--7_%2B_observability-brightgreen.svg)](./ROADMAP.md)
+[![Status: 1.0.0](https://img.shields.io/badge/status-1.0.0-brightgreen.svg)](./ROADMAP.md)
 
 </div>
 
@@ -19,13 +19,21 @@ hashable manifest that **any other machine can verify independently**.
 
 ## Current state — read this before cloning
 
-**Phases 0 to 7 are complete, plus observability, and the application runs.** You can clone it,
-bring the stack up and put a pull request through the full pipeline: sandboxed test execution,
-evidence collection, risk scoring, policy evaluation and a signed `proof-manifest.json`.
+**Version 1.0.0. Phases 0 to 8 are complete and the application runs.** You can clone it, bring
+the stack up and put a pull request through the full pipeline: sandboxed test execution, evidence
+collection, risk scoring, policy evaluation, a GitHub Check Run, and a signed
+`proof-manifest.json`. The GitHub App is registered, sign-in is GitHub OAuth, and webhook
+deliveries are routed to the organization that owns the installation.
 
-What is **not** finished, said plainly: the GitHub App is not registered yet, so there is no
-sign-in through GitHub and no automatic reaction to real pull-request webhooks — you drive the
-pipeline yourself. [`ROADMAP.md`](./ROADMAP.md) tracks the rest.
+**Every change to this repository proves itself.** The `Evidence · this change, proved` job in CI
+runs the engine on the commit under review and verifies the manifest it produces with the
+TypeScript library, then publishes the bundle as a build artifact. It is the claim being made
+about the project, tested against the project.
+
+What is **not** here, said plainly: no Kubernetes manifests, no Helm chart, no distributed
+tracing, and no plugin SDK. Those were planned and are now deliberately out of scope —
+[`ROADMAP.md`](./ROADMAP.md) says why for each. And the public instance below cannot produce real
+evidence; that limitation is described where the links are.
 
 ---
 
@@ -198,11 +206,14 @@ in-memory storage and says so in the logs; nothing is persisted across a restart
 `NEXT_PUBLIC_API_URL` is read by the dashboard's client bundle at **build** time, so
 pointing it at a different API means rebuilding the image, not restarting the container.
 
-[`render.yaml`](./render.yaml) is a Render blueprint for both services plus PostgreSQL.
-`WEB_BASE_URL` and `NEXT_PUBLIC_API_URL` are prompted for rather than wired between services,
-because Render can only supply a bare hostname and both values need the scheme. The blueprint
-itself is still unproven: the instance below was created service by service rather than from
-this file, which declares paid plans and neither Redis nor a worker.
+[`render.yaml`](./render.yaml) is a Render blueprint for both services, on free plans and with no
+database — a demonstration should not be able to start billing whoever deploys it, and Render's
+free PostgreSQL expires 30 days after creation, which would make the demo a link that breaks by
+itself. Without `DATABASE_URL` the API runs on its in-memory store and says so; add a
+`databases:` entry on a paid plan for a deployment that keeps its data. `WEB_BASE_URL` and
+`NEXT_PUBLIC_API_URL` are prompted for rather than wired between services, because Render can
+only supply a bare hostname and both values need the scheme. The blueprint itself is still
+unproven: the instance below was created service by service rather than from this file.
 
 ### A public instance is running, and it cannot produce real evidence
 
@@ -222,11 +233,16 @@ or CI. Ask any instance which it is: `/ready` answers `"evidence": "simulated"` 
 Where the pipeline should execute is settled in
 [ADR 0009](./docs/adr/0009-where-the-pipeline-executes.md): the worker built in Phase 8a
 already collects real evidence wherever it has Docker and the engine, and the hosted
-service will execute in GitHub Actions rather than take custody of anyone's code.
+service will execute in GitHub Actions rather than take custody of anyone's code. **That
+second half is demonstrated here** — the `Evidence · this change, proved` CI job runs the
+real pipeline on every commit and publishes the verified bundle, on the same kind of runner
+a hosted service would use. What is missing for other people's repositories is the ingestion
+route and OIDC verification, not the ability to measure.
 
-It runs on Render's free plan, which shows: the services hibernate after roughly 15 idle
-minutes, so the first request takes about 50 seconds, and the free PostgreSQL expires
-around 2026-08-23.
+It runs on Render's free plan, which shows in two places: the services hibernate after
+roughly 15 idle minutes, so the first request takes about 50 seconds, and there is no
+database, so organizations, repositories and analyses are held in memory and do not survive a
+restart. Both are properties of the demo, not of the software.
 
 ## Test execution
 
@@ -298,10 +314,10 @@ already prove things. Full plan in [ROADMAP.md](./ROADMAP.md).
 - **Phase 6** — Risk & Policy engines ✅
 - **Phase 7** — AI agents (provider-neutral) ✅
 - **Observability** — structured logs, metrics at `/metrics` ✅
-- **Phase 8** — Distributed workers 🚧 (queue, workers and cross-process events done; the API
-  and worker images build on every change in CI but are not published anywhere; Kubernetes/Helm
-  and tracing remain)
-- **Phase 9** — SDK & plugins
+- **Phase 8** — Distributed workers ✅ (queue, workers and cross-process events, proven against a
+  real Redis in CI)
+- **Kubernetes/Helm, distributed tracing, plugin SDK** — planned once, now out of scope, with the
+  reasoning in [ROADMAP.md](./ROADMAP.md)
 
 ### What Phase 7 contains, and what it has been through
 

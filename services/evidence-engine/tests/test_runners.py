@@ -121,3 +121,25 @@ class TestImages:
         write(tmp_path, "pyproject.toml", '[project]\nname="x"\ndependencies=["pytest-benchmark"]')
 
         assert runners.benchmark_plan_for(tmp_path).image == "registry.internal/py:1"
+
+
+def test_a_uv_workspace_installs_its_members_before_the_tests_run() -> None:
+    # A bare `uv sync` on a workspace root installs the root project and none of
+    # its members, so the tests cannot import what they test and pytest writes a
+    # report full of collection errors. The parser would read that, correctly, as
+    # a failing suite — a verdict about the change produced by a runner that
+    # simply failed to install it.
+    plan = runners.plan_for("pytest")
+
+    assert "uv sync --frozen --all-packages" in plan.script
+
+
+def test_the_uv_invocation_stays_within_the_pinned_uv_in_the_image() -> None:
+    # `--active` was rejected by the uv the sandbox image pins, and under `set -e`
+    # that killed the script before pytest ran — every uv project reported "no
+    # JUnit report produced". Activating the venv first is what makes uv install
+    # into the one we are about to run, so the flag buys nothing.
+    plan = runners.plan_for("pytest")
+
+    assert "--active" not in plan.script
+    assert ". .venv/bin/activate" in plan.script
