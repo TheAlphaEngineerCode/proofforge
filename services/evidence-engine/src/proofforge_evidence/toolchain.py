@@ -49,6 +49,24 @@ def _read_report(path: Path) -> str | None:
     return text if text.strip() else None
 
 
+def _open_to_the_sandbox_user(out: Path) -> None:
+    """Let the container write its reports into `out`.
+
+    The sandbox runs as uid 10001 and that is not negotiable — it is the whole
+    point of running someone else's tests in a container. `mkdtemp` creates the
+    output directory as 0700 owned by whoever started the engine, so the two
+    never match on a real host and the run ends with `Permission denied` on
+    junit.xml *after* the tests have already passed. The collector then reports
+    "no JUnit report produced", which reads as a repository whose tests could not
+    run rather than as a directory the reports could not be written to.
+
+    This only ever applies to a `mkdtemp` directory that exists for the length of
+    one run and holds reports the sandbox itself produced.
+    """
+
+    out.chmod(0o777)
+
+
 def _why_it_failed(stderr: str, limit: int = 300) -> str:
     """The last `limit` characters of stderr — where the reason actually is.
 
@@ -133,6 +151,7 @@ class HostToolchain:
 
         with tempfile.TemporaryDirectory() as out_dir:
             out = Path(out_dir)
+            _open_to_the_sandbox_user(out)
             spec = SandboxSpec(
                 image=plan.image,
                 command=[plan.script],
@@ -192,6 +211,7 @@ class HostToolchain:
 
         with tempfile.TemporaryDirectory() as out_dir:
             out = Path(out_dir)
+            _open_to_the_sandbox_user(out)
             spec = SandboxSpec(
                 image=plan.image,
                 command=[plan.script],

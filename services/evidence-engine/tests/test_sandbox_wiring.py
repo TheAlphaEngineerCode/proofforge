@@ -210,3 +210,23 @@ def test_the_reason_reported_is_the_end_of_stderr_not_the_start(
     assert junit.status == "error"
     assert "no tests ran" in junit.detail
     assert "Unable to find image" not in junit.detail
+
+
+def test_the_output_mount_is_writable_by_the_container_user(tmp_path: Path, monkeypatch) -> None:
+    # The sandbox runs as uid 10001 by design; mkdtemp makes the output directory
+    # 0700 owned by whoever started the engine. On a real host the two never
+    # match, and the run ends with `Permission denied` on junit.xml *after* the
+    # tests have already passed — reported as a repository whose tests could not
+    # run rather than as a directory the reports could not be written to.
+    seen: list[int] = []
+    monkeypatch.setattr("proofforge_evidence.toolchain.docker_available", lambda: True)
+
+    class ModeRecordingSandbox(RecordingSandbox):
+        def run(self, spec: SandboxSpec) -> SandboxResult:
+            out = next(m.host for m in spec.mounts if m.container == runners.OUTPUT_DIR)
+            seen.append(out.stat().st_mode & 0o777)
+            return super().run(spec)
+
+    HostToolchain(sandbox=ModeRecordingSandbox()).run_tests(node_repo(tmp_path))
+
+    assert seen and seen[0] & 0o022 == 0o022
