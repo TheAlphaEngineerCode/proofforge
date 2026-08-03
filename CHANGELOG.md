@@ -96,9 +96,17 @@ schema and the CLI's exit codes are now things other software may depend on.
 
 ### Fixed
 
-Three defects the new CI job surfaced in its first hours, each hidden behind the one
+Four defects the new CI job surfaced in its first hours, each hidden behind the one
 before it — none of them findable by reading the code, all of them found by running it.
 
+- **The sandbox could not write the reports it had just produced.** This is why the test
+  collector had never worked outside fixtures. `mkdtemp` creates the output directory as
+  0700 owned by whoever starts the engine, while the container runs as uid 10001 — which
+  is the point of running someone else's tests in a container — so on any real host
+  pytest passed and then died on `Permission denied: '/out/junit.xml'`. It went unnoticed
+  because Docker Desktop's bind mounts ignore file modes: it worked on a laptop and
+  failed everywhere that mattered. The per-run directory is now opened to the container
+  user.
 - **The manifest could name a confident wrong cause.** A failing collector reported the
   first 300 characters of the tool's stderr, and a tool that fetches something fills
   those with progress: the first run blamed a Docker image pull that had in fact
