@@ -67,6 +67,10 @@ proofforge evidence build . --json
   being installed exits `2` (nothing ran), a manifest that fails verification exits `1`.
 - The engine runs as a Python service under `uv`; set `PROOFFORGE_EVIDENCE_DIR` if it is not
   found automatically.
+- `PROOFFORGE_TOOL_TIMEOUT_S` raises the per-collector timeout from its 300-second default.
+  The test collector spends that budget installing dependencies before a single test runs, so
+  on a large repository the whole run is reported as `timeout` — a true statement about the
+  clock rather than about the change. A value that is not a positive integer is ignored.
 
 ### `evidence verify <file>`
 
