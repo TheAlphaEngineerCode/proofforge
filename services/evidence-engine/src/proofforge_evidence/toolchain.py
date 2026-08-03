@@ -49,22 +49,31 @@ def _read_report(path: Path) -> str | None:
     return text if text.strip() else None
 
 
-def _open_to_the_sandbox_user(out: Path) -> None:
-    """Let the container write its reports into `out`.
+def _reports_dir(scratch: str) -> Path:
+    """A directory inside `scratch` that the sandbox can write its reports into.
 
     The sandbox runs as uid 10001 and that is not negotiable — it is the whole
-    point of running someone else's tests in a container. `mkdtemp` creates the
-    output directory as 0700 owned by whoever started the engine, so the two
-    never match on a real host and the run ends with `Permission denied` on
-    junit.xml *after* the tests have already passed. The collector then reports
-    "no JUnit report produced", which reads as a repository whose tests could not
-    run rather than as a directory the reports could not be written to.
+    point of running someone else's tests in a container. `mkdtemp` creates its
+    directory as 0700 owned by whoever started the engine, so the two never match
+    on a real host and the run ends with `Permission denied` on junit.xml *after*
+    the tests have already passed. The collector then reports "no JUnit report
+    produced", which reads as a repository whose tests could not run rather than
+    as a directory the reports could not be written to.
 
-    This only ever applies to a `mkdtemp` directory that exists for the length of
-    one run and holds reports the sandbox itself produced.
+    Hence a mode the container's user can write. It goes on a directory *nested*
+    inside the `mkdtemp` one rather than on that directory itself, and the nesting
+    is the security boundary rather than a tidiness preference: a world-writable
+    directory that anyone on the host can reach is somewhere a second local
+    account could swap junit.xml between the container writing it and the engine
+    reading it, which is evidence tampering in the one tool that must not permit
+    it. The 0700 parent means nobody but us can walk in; the container never walks
+    in either, since the daemon mounts the directory by inode.
     """
 
-    out.chmod(0o777)
+    reports = Path(scratch) / "reports"
+    reports.mkdir()
+    reports.chmod(0o777)
+    return reports
 
 
 def _why_it_failed(stderr: str, limit: int = 300) -> str:
@@ -149,9 +158,8 @@ class HostToolchain:
         except runners.UnsupportedStackError as err:
             return _both_unavailable(f"no supported test runner: {err}")
 
-        with tempfile.TemporaryDirectory() as out_dir:
-            out = Path(out_dir)
-            _open_to_the_sandbox_user(out)
+        with tempfile.TemporaryDirectory() as scratch:
+            out = _reports_dir(scratch)
             spec = SandboxSpec(
                 image=plan.image,
                 command=[plan.script],
@@ -209,9 +217,8 @@ class HostToolchain:
         except runners.UnsupportedStackError as err:
             return _unavailable(str(err))
 
-        with tempfile.TemporaryDirectory() as out_dir:
-            out = Path(out_dir)
-            _open_to_the_sandbox_user(out)
+        with tempfile.TemporaryDirectory() as scratch:
+            out = _reports_dir(scratch)
             spec = SandboxSpec(
                 image=plan.image,
                 command=[plan.script],

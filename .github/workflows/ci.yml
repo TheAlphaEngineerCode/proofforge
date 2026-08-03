@@ -296,12 +296,19 @@ jobs:
 
       - name: Install Gitleaks and Semgrep
         # Same Gitleaks version the security job runs, so the two jobs cannot
-        # disagree about what a secret is.
+        # disagree about what a secret is. The digest is checked before the
+        # archive is unpacked, rather than piping the download straight into tar:
+        # this job exists to make claims about supply chains, and running an
+        # unverified binary to do it would be an odd way to start.
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.local/bin"
-          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz" \
-            | tar -xz -C "$HOME/.local/bin" gitleaks
+          curl -fsSL -o gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz" \
+            | sha256sum --check --strict -
+          tar -xzf gitleaks.tar.gz -C "$HOME/.local/bin" gitleaks
+          rm gitleaks.tar.gz
           uv tool install semgrep
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
