@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Work out the image name
         id: image
@@ -54,7 +54,7 @@ jobs:
         run: echo "name=ghcr.io/${OWNER,,}/proofforge-sandbox-$STACK" >> "$GITHUB_OUTPUT"
 
       - name: Build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: infrastructure/docker
           file: infrastructure/docker/sandbox-${{ matrix.stack }}.Dockerfile
