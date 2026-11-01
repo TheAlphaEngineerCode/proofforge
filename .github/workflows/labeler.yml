@@ -15,7 +15,7 @@ jobs:
     steps:
       # pull_request_target is safe here because no contributor code is checked
       # out or executed. The official action reads only the base configuration.
-      - uses: actions/labeler@v6
+      - uses: actions/labeler@v7
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           sync-labels: true
